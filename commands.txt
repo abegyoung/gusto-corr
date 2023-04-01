@@ -1,0 +1,44 @@
+#!python
+
+# remote shell to spectrometer
+ssh -oKexAlgorithms=diffie-hellman-group1-sha1 -oHostKeyAlgorithms=+ssh-dss root@192.168.0.201
+
+# kill Mac OS tftpd and start tftpd-hpa
+~/bin/tftpdctl.sh stop
+sudo /opt/local/sbin/tftpd -L -c -s /private/tftpboot/
+
+fswatch -or ./out.spec |xargs -n1 -I{} ./plot.sh
+
+REPLACE NINT n with NINT n+1
+gsed -i -r 's/(NINT )([0-9]+)/echo "\1$((\2+1))"/ge' out.lags
+
+
+                                HEADER              MESSAGE
+                          =================== ===================   
+                      Byte 0   1   2   3   4   0   1   2   3   4
+#ACS power                CMD LEN             DEV  ON
+s.send(b'\x0e\x00\x00\x00\x88\x05\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00')
+
+#Setup                    CMD LEN             DEV LAG FTP
+s.send(b'\x0e\x00\x00\x00\x81\x05\x00\x00\x00\x00\x8f\x03\x00\x00\x00\x00\x00\x00')
+
+#Integration time         CMD LEN             DEV (--32bit int--)
+s.send(b'\x0e\x00\x00\x00\x82\x05\x00\x00\x00\x00\x40\x42\x0f\x00\x00\x00\x00\x00')
+
+#set output path          CMD LEN               1   9   2   .   1   6   8   .   0   .   2   0
+s.send(b'\x17\x00\x00\x00\x91\x0e\x00\x00\x00\x31\x39\x32\x2e\x31\x36\x38\x2e\x30\x2e\x32\x30\x00\x00\x00\x00\x00\x00')
+
+#set output filename      CMD LEN              f   i   l   e   n   a   m   e
+s.send(b'\x13\x00\x00\x00\x90\x0a\x00\x00\x00\x66\x69\x6c\x65\x6e\x61\x6d\x65\x00\x00\x00\x00\x00\x00')
+
+#AUTO CAL                 CMD LEN             DEV NUM 
+s.send(b'\x0e\x00\x00\x00\x87\x05\x00\x00\x00\x01\x14\x00\x00\x00\x00\x00\x00\x00')
+
+#TRIGGER                  CMD LEN             DEV
+s.send(b'\x0e\x00\x00\x00\x83\x05\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00')
+
+#READ OUTPUT              CMD LEN             DEV
+s.send(b'\x0e\x00\x00\x00\x06\x05\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00')
+
+#REBOOT                   CMD LEN
+s.send(b'\x0e\x00\x00\x00\xa1\x05\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00')
