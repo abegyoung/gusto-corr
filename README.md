@@ -1,3 +1,4 @@
+# README for the gusto-corr repository
 # gusto-corr
 Omnisys correlator prototype software
 
