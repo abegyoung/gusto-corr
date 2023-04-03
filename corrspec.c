@@ -169,7 +169,7 @@ void makeSpec(fsw_cevent const * const events,
    seconds = end.tv_sec - hashdone.tv_sec;
    microseconds = end.tv_usec - hashdone.tv_usec;
    elapsed = seconds + microseconds*1e-6;
-   printf("FFTW %.3f\n", elapsed);
+   printf("FFTW %.3f\n\n", elapsed);
 
 }
 
