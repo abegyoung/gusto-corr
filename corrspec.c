@@ -15,6 +15,7 @@
 #define MAX_STR_LEN 32
 #define PI 3.14159
 
+// Make 4 structs for 128,256,384,512 FFT array lengths
 struct Spectrum
 {
    fftw_complex *in, *out;
@@ -176,7 +177,7 @@ void makeSpec(fsw_cevent const * const events,
 int main(int argc, char **argv){
   void* data;
 
-// Setup possible FFTW array lengths
+// Setup all possible FFTW array lengths
    for(i=0; i<4; i++){
      N=(i+1)*128;
      spec[i].in  = (fftw_complex *) fftw_malloc((4*N-1) *  sizeof(fftw_complex));
@@ -198,10 +199,11 @@ int main(int argc, char **argv){
 
    }
 
-   fftw_destroy_plan(spec[i].p);
-   fftw_free(spec[i].in);
-   fftw_free(spec[i].out);
-
+   for(i=0; i<4; i++){
+     fftw_destroy_plan(spec[i].p);
+     fftw_free(spec[i].in);
+     fftw_free(spec[i].out);
+   }
 
 }
 
