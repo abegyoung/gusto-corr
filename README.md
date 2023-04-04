@@ -13,8 +13,14 @@ Provides a C library for access to the inverse error function erfinv( ) which ta
 libit.sourceforge.net/index.html
 
 Installation of the library  is to download libit-0.2.3 from sourceforge and install where the FFT of the lags will be done.
+
+Fix some things
+
+1) in src/convcode.c:53, fls=>fls2, as well as name changed through.  Todo: make a patch for this, or even better fix it and use the one in strings.h if possible.
+
+To install on OS X:
 ```
-./configure
+./configure --target=x86_64 --prefix=/opt/local
 make
 make install
 ```
@@ -48,4 +54,12 @@ On FreeBSD, `fswatch` can be installed using [pkg]:
 
 ```console
 # pkg install fswatch-mon
+```
+
+### corrspec
+To compile `corrspec`
+
+```
+make dict
+make corrspec
 ```
