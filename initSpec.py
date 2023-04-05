@@ -1,4 +1,4 @@
-#!/opt/local/bin/python3.10
+#!/usr/bin/python3
 import ctypes
 import sys
 import time
@@ -10,8 +10,8 @@ parser.add_argument("-n", "--lags", help="number of lags", default="512")
 parser.add_argument("-d", "--dev", help="HIFAS #", default="1")
 parser.add_argument("-ip", "--serverip", help="correlator IP address", default="192.168.0.201")
 parser.add_argument("-i", "--intTime", help="integration time (usec)", default="250000")
-parser.add_argument("-path", "--path", help="PATH", default="192.168.0.20")
-parser.add_argument("-fname", "--fname", help="FILENAME", default="default")
+parser.add_argument("-p", "--path", help="PATH", default="/var/tmp")
+parser.add_argument("-f", "--fname", help="FILENAME", default="default")
 parser.add_argument("-off", "--off", help="turn off ACS PWR", action='store_true')
 args = parser.parse_args()
 
@@ -46,7 +46,7 @@ for a in range(*devlist):
 
 
 #ACS Setup
-TFTP=int(3).to_bytes(1, byteorder='little')
+TFTP=int(1).to_bytes(1, byteorder='little')
 if (int(lags)==512):
   LAG=b'\x0f'
 elif (int(lags)==384):
@@ -76,16 +76,16 @@ for a in range(*devlist):
 
 
 #Set output PATH
-CMD=b'\x91'
-PATH=bytes(path, 'utf-8')+b'\x00\x00'
-SUF=b'\x00\x00\x00\x00'
-LEN2=(len(PATH)).to_bytes(4, byteorder='little')
-LEN1=(len(CMD)+len(LEN2)+len(PATH)+len(SUF)).to_bytes(4, byteorder='little')
-cmd=LEN1+CMD+LEN2+PATH+SUF
-s.send(cmd)
-time.sleep(0.2)
-data=s.recv(100)
-print(data)
+#CMD=b'\x91'
+#PATH=bytes(path, 'utf-8')+b'\x00\x00'
+#SUF=b'\x00\x00\x00\x00'
+#LEN2=(len(PATH)).to_bytes(4, byteorder='little')
+#LEN1=(len(CMD)+len(LEN2)+len(PATH)+len(SUF)).to_bytes(4, byteorder='little')
+#cmd=LEN1+CMD+LEN2+PATH+SUF
+#s.send(cmd)
+#time.sleep(0.2)
+#data=s.recv(100)
+#print(data)
 
 
 #Set output FILENAME

@@ -10,7 +10,13 @@
 #include <ctype.h>
 #include <string.h>
 #include "dict.h"
+#include <sys/types.h>
+#include <sys/inotify.h>
 #include <libfswatch/c/libfswatch.h>
+
+
+#define EVENT_SIZE (sizeof (struct inotify_event))
+#define EVENT_BUF_LEN (1024*(EVENT_SIZE+16))
 
 #define MAX_STR_LEN 32
 #define PI 3.14159
@@ -46,14 +52,18 @@ struct corrType
 
 struct corrType corr;
 
+/*
 void makeSpec(fsw_cevent const * const events,
          const unsigned int event_num,
          void * data)
+*/
+void makeSpec()
 {
 
   //timing
   struct timeval begin, hashdone, end;
   gettimeofday(&begin, 0);
+
 
    int NBYTES;
 
@@ -71,12 +81,15 @@ void makeSpec(fsw_cevent const * const events,
    key = malloc(MAX_STR_LEN);
    value = malloc(MAX_STR_LEN);
 
-   usleep(10000);
+   //usleep(100000);
    fin = fopen("out.lags", "r");
    for(i=0; i<27; i++){
      fscanf(fin, "%s %s\n", key, value);
      ht_insert(ht, key, value);
    }
+
+
+
 
    // fill variables from hash table
    corr.corrtime = atoi(ht_search(ht, (char *) "CORRTIME"));
@@ -90,10 +103,11 @@ void makeSpec(fsw_cevent const * const events,
    VQlo     = atof(ht_search(ht, (char *) "VQlo"  ));
    VIlo     = atof(ht_search(ht, (char *) "VIlo"  ));
 
+
    //timing
    gettimeofday(&hashdone, 0);
 
-   usleep(1000);
+   //usleep(1000);
 
    fout = fopen("out.spec", "w");
 
@@ -106,7 +120,6 @@ void makeSpec(fsw_cevent const * const events,
      N = 256;
    else if (NBYTES==2112)
      N = 128;
-   printf("nlags=%d\n", N);
    int specA = (int) N/128 - 1;
 
    //First byte is Correlator STATUS
@@ -148,13 +161,17 @@ void makeSpec(fsw_cevent const * const events,
    P_I = pow((VIhi-VIlo),2) * 1.8197 / pow((erfinv(1-2*(double)corr.Ihi/(double)corr.corrtime)) + (erfinv(1-2*(double)corr.Ilo/(double)corr.corrtime)),2);
    P_Q = pow((VQhi-VQlo),2) * 1.8197 / pow((erfinv(1-2*(double)corr.Qhi/(double)corr.corrtime)) + (erfinv(1-2*(double)corr.Qlo/(double)corr.corrtime)),2);
 
-   printf("etaQ %.3f\n", 1/sqrt(P_I*P_Q));
 
    //Print in counts per second (assuming 4700
    for(i=0; i<2*N; i++)
      fprintf(fout, "%d\t%lf\n", (4500*i)/(2*N), (4500.*1000000.)/(corr.corrtime*256.)*sqrt(P_I*P_Q)*sqrt(fabs(spec[specA].out[i][0]*(-1*spec[specA].out[i][1]))) );
 
 // Cleanup
+   //DEBUG
+   printf("UNIXTIME is %s\n", ht_search(ht, (char *) "UNIXTIME"));
+   printf("%.2f %.2f %.2f %.2f\n", (double)corr.Qhi/(double)corr.corrtime, (double)corr.Ihi/(double)corr.corrtime, (double)corr.Qlo/(double)corr.corrtime, (double)corr.Ilo/(double)corr.corrtime);
+   printf("nlags=%d\n", N);
+   printf("etaQ %.3f\n", 1/sqrt(P_I*P_Q));
 
    free_table(ht);
    fclose(fout);
@@ -165,17 +182,22 @@ void makeSpec(fsw_cevent const * const events,
    long seconds = hashdone.tv_sec - begin.tv_sec;
    long microseconds = hashdone.tv_usec - begin.tv_usec;
    double elapsed = seconds + microseconds*1e-6;
-   printf("Hash table %.3f\n", elapsed);
+   printf("Hash table %.1f ms\n", 1000.*elapsed);
 
    seconds = end.tv_sec - hashdone.tv_sec;
    microseconds = end.tv_usec - hashdone.tv_usec;
    elapsed = seconds + microseconds*1e-6;
-   printf("FFTW %.3f\n\n", elapsed);
+   printf("FFTW %.1f ms\n\n", 1000.*elapsed);
 
 }
 
 int main(int argc, char **argv){
   void* data;
+
+  int fd;
+  int wd;
+  int length;
+  char buffer[EVENT_BUF_LEN];
 
 // Setup all possible FFTW array lengths
    for(i=0; i<4; i++){
@@ -187,15 +209,22 @@ int main(int argc, char **argv){
    fftw_import_system_wisdom();
 
 
-   /* Initialize fswatch */
+   /* Initialize fswatch or inotify */
+/*
    fsw_init_library();
    const FSW_HANDLE handle = fsw_init_session(fsevents_monitor_type);
+   const FSW_HANDLE handle = fsw_init_session(inotify_monitor_type);
    fsw_add_path(handle, "./out.lags");
    fsw_set_callback(handle, makeSpec, data);
+*/
+   fd = inotify_init();
+   wd = inotify_add_watch(fd, "./out.lags", IN_CLOSE_WRITE);
 
    while(1){
 
-     fsw_start_monitor(handle);
+     //fsw_start_monitor(handle);
+     length = read(fd, buffer, EVENT_BUF_LEN);
+     makeSpec();
 
    }
 
