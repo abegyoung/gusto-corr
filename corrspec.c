@@ -11,12 +11,7 @@
 #include <string.h>
 #include "dict.h"
 #include <sys/types.h>
-#include <sys/inotify.h>
-#include <libfswatch/c/libfswatch.h>
-
-
-#define EVENT_SIZE (sizeof (struct inotify_event))
-#define EVENT_BUF_LEN (1024*(EVENT_SIZE+16))
+#include "corrspec.h"
 
 #define MAX_STR_LEN 32
 #define PI 3.14159
@@ -52,12 +47,9 @@ struct corrType
 
 struct corrType corr;
 
-/*
-void makeSpec(fsw_cevent const * const events,
+   void makeSpec(fsw_cevent const * const events,
          const unsigned int event_num,
          void * data)
-*/
-void makeSpec()
 {
 
   //timing
@@ -197,7 +189,9 @@ int main(int argc, char **argv){
   int fd;
   int wd;
   int length;
+#ifdef USE_INOTIFY
   char buffer[EVENT_BUF_LEN];
+#endif
 
 // Setup all possible FFTW array lengths
    for(i=0; i<4; i++){
@@ -210,21 +204,27 @@ int main(int argc, char **argv){
 
 
    /* Initialize fswatch or inotify */
-/*
+#ifdef USE_FSWATCH
    fsw_init_library();
    const FSW_HANDLE handle = fsw_init_session(fsevents_monitor_type);
-   const FSW_HANDLE handle = fsw_init_session(inotify_monitor_type);
+   //const FSW_HANDLE handle = fsw_init_session(inotify_monitor_type);
    fsw_add_path(handle, "./out.lags");
    fsw_set_callback(handle, makeSpec, data);
-*/
+#endif
+#ifdef USE_INOTIFY
    fd = inotify_init();
    wd = inotify_add_watch(fd, "./out.lags", IN_CLOSE_WRITE);
+#endif
 
    while(1){
 
-     //fsw_start_monitor(handle);
+#ifdef USE_FSWATCH
+     fsw_start_monitor(handle);
+#endif
+#ifdef USE_INOTIFY
      length = read(fd, buffer, EVENT_BUF_LEN);
      makeSpec();
+#endif
 
    }
 
