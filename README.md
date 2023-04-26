@@ -63,3 +63,33 @@ To compile `corrspec`
 make dict
 make corrspec
 ```
+
+## Using corrspec
+To test FFT functionality, build with either fswatch or inotify.
+
+Run in the current directory and update the watched file out.lags by copying from the data directory into the currently watched directory.
+
+```
+./corrspec
+```
+In another window:
+```
+cp data/out.lags .
+```
+Output:
+```
+young@Abrams-MacBook-Pro gusto-corr % ./corrspec 
+UNIXTIME is 2023-04-03_21:38:32.108
+0.00 0.00 0.00 0.00
+nlags=128
+etaQ 423.554
+Hash table 1.6 ms
+FFTW 1.3 ms
+
+UNIXTIME is 2023-04-03_21:38:32.108
+0.00 0.00 0.00 0.00
+nlags=128
+etaQ 423.554
+Hash table 1.4 ms
+FFTW 1.5 ms
+```

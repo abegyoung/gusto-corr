@@ -210,6 +210,7 @@ int main(int argc, char **argv){
    //const FSW_HANDLE handle = fsw_init_session(inotify_monitor_type);
    fsw_add_path(handle, "./out.lags");
    fsw_set_callback(handle, makeSpec, data);
+printf("here\n");
 #endif
 #ifdef USE_INOTIFY
    fd = inotify_init();
