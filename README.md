@@ -94,3 +94,25 @@ Hash table 1.4 ms
 FFTW 1.5 ms
 ```
 The `corrspec` binary notices the file has changed, reads it, automatically determines the length of the lags, and runs the corresponding FFTW (128, 256, 384, or 512) and outputs the spectra to `out.spec`.  Performance data is printed to the terminal where the program is run from.
+
+Tests on gusto-data compiled with inotify result in slightly longer FFT times:
+
+```
+young@gusto-data:~/gusto-corr$ ./corrspec 
+UNIXTIME is 2023-04-03_21:38:32.108
+intTime is 250.0 msec
+0.00 0.00 0.00 0.00
+nlags=128
+etaQ 423.554
+Hash table 5.9 ms
+FFTW 14.9 ms
+
+UNIXTIME is 2023-04-03_21:38:32.108
+intTime is 250.0 msec
+0.00 0.00 0.00 0.00
+nlags=128
+etaQ 423.554
+Hash table 5.7 ms
+FFTW 13.5 ms
+```
+YMMV
