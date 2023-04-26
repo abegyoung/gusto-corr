@@ -93,3 +93,4 @@ etaQ 423.554
 Hash table 1.4 ms
 FFTW 1.5 ms
 ```
+The `corrspec` binary notices the file has changed, reads it, automatically determines the length of the lags, and runs the corresponding FFTW (128, 256, 384, or 512) and outputs the spectra to `out.spec`.  Performance data is printed to the terminal where the program is run from.
