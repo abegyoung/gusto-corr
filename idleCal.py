@@ -8,8 +8,8 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("-n", "--lags", help="number of lags", default="128")
 parser.add_argument("-d", "--dev", help="HIFAS #", default="1")
-parser.add_argument("-ip", "--serverip", help="correlator IP address", default="192.168.0.201")
-parser.add_argument("-tftp", "--tftp", help="tftp IP address", default="192.168.0.20")
+parser.add_argument("-ip", "--serverip", help="correlator IP address", default="192.168.1.201")
+parser.add_argument("-tftp", "--tftp", help="tftp IP address", default="192.168.1.20")
 args = parser.parse_args()
 
 lags=args.lags

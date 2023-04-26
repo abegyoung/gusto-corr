@@ -8,7 +8,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("-n", "--lags", help="number of lags", default="512")
 parser.add_argument("-d", "--dev", help="HIFAS #", default="1")
-parser.add_argument("-ip", "--serverip", help="correlator IP address", default="192.168.0.201")
+parser.add_argument("-ip", "--serverip", help="correlator IP address", default="192.168.1.201")
 parser.add_argument("-i", "--intTime", help="integration time (usec)", default="250000")
 parser.add_argument("-p", "--path", help="PATH", default="/var/tmp")
 parser.add_argument("-f", "--fname", help="FILENAME", default="default")
