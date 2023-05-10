@@ -6,6 +6,7 @@ import socket
 import struct
 import argparse
 from datetime import datetime
+import subprocess
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-d", "--dev", help="HIFAS #", default="1")
@@ -41,9 +42,11 @@ VQhi = struct.unpack("<f", data[11:15])
 VIlo = struct.unpack("<f", data[15:19])
 VQlo = struct.unpack("<f", data[19:23])
 
-TRG=(1<<(dev-1)).to_bytes(1, byteorder='little')
-#TRIGGER               CMD LEN              TRG
-cmd=b'\x0a\x00\x00\x00\x83\x01\x00\x00\x00'+TRG+b'\x00\x00\x00\x00'
+time.sleep(.5)
+
+MASK=(1<<(dev-1)).to_bytes(1, byteorder='little')
+#TRIGGER               CMD LEN              MASK
+cmd=b'\x0a\x00\x00\x00\x83\x01\x00\x00\x00'+MASK+b'\x00\x00\x00\x00'
 s.send(cmd)
 bytes_to_get=int.from_bytes(recv_len(s, 4), byteorder='little')
 data=recv_len(s, bytes_to_get)
@@ -76,7 +79,7 @@ data=recv_len(s, bytes_to_get-9)
 #fp.close()
 
 #save text output
-fp=open("out.lags", "w")
+fp=open("out0.lags", "w")
 print("FIFO",fifo,file=fp)
 
 #remaining 8300 bytes are header and lags
@@ -147,3 +150,5 @@ for i in range(0,NLAGS):
 
 s.close()
 fp.close()
+subprocess.run(
+        ['mv', 'out0.lags', 'out.lags'], stdout=subprocess.PIPE).stdout.decode('utf-8')

@@ -46,7 +46,7 @@ for a in range(*devlist):
 
 
 #ACS Setup
-TFTP=int(1).to_bytes(1, byteorder='little')
+TFTP=int(0).to_bytes(1, byteorder='little')
 if (int(lags)==512):
   LAG=b'\x0f'
 elif (int(lags)==384):
@@ -76,28 +76,28 @@ for a in range(*devlist):
 
 
 #Set output PATH
-#CMD=b'\x91'
-#PATH=bytes(path, 'utf-8')+b'\x00\x00'
-#SUF=b'\x00\x00\x00\x00'
-#LEN2=(len(PATH)).to_bytes(4, byteorder='little')
-#LEN1=(len(CMD)+len(LEN2)+len(PATH)+len(SUF)).to_bytes(4, byteorder='little')
-#cmd=LEN1+CMD+LEN2+PATH+SUF
-#s.send(cmd)
-#time.sleep(0.2)
-#data=s.recv(100)
-#print(data)
+CMD=b'\x91'
+PATH=bytes(path, 'utf-8')+b'\x00\x00'
+SUF=b'\x00\x00\x00\x00'
+LEN2=(len(PATH)).to_bytes(4, byteorder='little')
+LEN1=(len(CMD)+len(LEN2)+len(PATH)+len(SUF)).to_bytes(4, byteorder='little')
+cmd=LEN1+CMD+LEN2+PATH+SUF
+s.send(cmd)
+time.sleep(0.2)
+data=s.recv(100)
+print(data)
 
 
 #Set output FILENAME
-#CMD=b'\x90'
-#FNAME=bytes(fname, 'utf-8')+b'\x00\x00'
-#SUF=b'\x00\x00\x00\x00'
-#LEN2=(len(FNAME)).to_bytes(4, byteorder='little')
-#LEN1=(len(CMD)+len(LEN2)+len(FNAME)+len(SUF)).to_bytes(4, byteorder='little')
-#cmd=LEN1+CMD+LEN2+FNAME+SUF
-#s.send(cmd)
-#time.sleep(0.2)
-#data=s.recv(100)
-#print(data)
+CMD=b'\x90'
+FNAME=bytes(fname, 'utf-8')+b'\x00\x00'
+SUF=b'\x00\x00\x00\x00'
+LEN2=(len(FNAME)).to_bytes(4, byteorder='little')
+LEN1=(len(CMD)+len(LEN2)+len(FNAME)+len(SUF)).to_bytes(4, byteorder='little')
+cmd=LEN1+CMD+LEN2+FNAME+SUF
+s.send(cmd)
+time.sleep(0.2)
+data=s.recv(100)
+print(data)
 
 s.close()
