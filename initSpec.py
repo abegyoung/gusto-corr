@@ -13,6 +13,8 @@ parser.add_argument("-i", "--intTime", help="integration time (usec)", default="
 parser.add_argument("-p", "--path", help="PATH", default="/var/tmp")
 parser.add_argument("-f", "--fname", help="FILENAME", default="default")
 parser.add_argument("-off", "--off", help="turn off ACS PWR", action='store_true')
+parser.add_argument("-s", "--save", help="Save spectra", default='0')
+parser.add_argument("-t", "--tftp", help="Use TFTP", default='0')
 args = parser.parse_args()
 
 dev=int(args.dev)
@@ -26,6 +28,8 @@ intTime=args.intTime
 serverip=args.serverip
 path=args.path
 fname=args.fname
+save=args.save
+tftp=args.tftp
 
 #connect socket
 s=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -46,7 +50,7 @@ for a in range(*devlist):
 
 
 #ACS Setup
-TFTP=int(0).to_bytes(1, byteorder='little')
+TFTP=int((int(tftp)<<1)+int(save)).to_bytes(1, byteorder='little')
 if (int(lags)==512):
   LAG=b'\x0f'
 elif (int(lags)==384):
@@ -58,6 +62,7 @@ elif (int(lags)==128):
 for a in range(*devlist):
   DEV=a.to_bytes(1, byteorder='little')
   cmd=b'\x0c\x00\x00\x00'+b'\x81\x03\x00\x00\x00'+DEV+LAG+TFTP+b'\x00\x00\x00\x00'
+  print(cmd)
   s.send(cmd)
   time.sleep(0.2)
   data=s.recv(100)
@@ -89,15 +94,15 @@ print(data)
 
 
 #Set output FILENAME
-CMD=b'\x90'
-FNAME=bytes(fname, 'utf-8')+b'\x00\x00'
-SUF=b'\x00\x00\x00\x00'
-LEN2=(len(FNAME)).to_bytes(4, byteorder='little')
-LEN1=(len(CMD)+len(LEN2)+len(FNAME)+len(SUF)).to_bytes(4, byteorder='little')
-cmd=LEN1+CMD+LEN2+FNAME+SUF
-s.send(cmd)
-time.sleep(0.2)
-data=s.recv(100)
-print(data)
+#CMD=b'\x90'
+#FNAME=bytes(fname, 'utf-8')+b'\x00\x00'
+#SUF=b'\x00\x00\x00\x00'
+#LEN2=(len(FNAME)).to_bytes(4, byteorder='little')
+#LEN1=(len(CMD)+len(LEN2)+len(FNAME)+len(SUF)).to_bytes(4, byteorder='little')
+#cmd=LEN1+CMD+LEN2+FNAME+SUF
+#s.send(cmd)
+#time.sleep(0.2)
+#data=s.recv(100)
+#print(data)
 
 s.close()
