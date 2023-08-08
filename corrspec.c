@@ -47,9 +47,14 @@ struct corrType
 
 struct corrType corr;
 
+#ifdef USE_FSWATCH
    void makeSpec(fsw_cevent const * const events,
          const unsigned int event_num,
          void * data)
+#endif
+#ifdef USE_INOTIFY
+   makespec()
+#endif
 {
 
   //timing
@@ -161,6 +166,7 @@ struct corrType corr;
 // Cleanup
    //DEBUG
    printf("UNIXTIME is %s\n", ht_search(ht, (char *) "UNIXTIME"));
+   printf("DEV is %s\n", ht_search(ht, (char *) "DEV"));
    printf("%.2f %.2f %.2f %.2f\n", (double)corr.Qhi/(double)corr.corrtime, (double)corr.Ihi/(double)corr.corrtime, (double)corr.Qlo/(double)corr.corrtime, (double)corr.Ilo/(double)corr.corrtime);
    printf("nlags=%d\n", N);
    printf("etaQ %.3f\n", 1/sqrt(P_I*P_Q));
@@ -210,7 +216,6 @@ int main(int argc, char **argv){
    //const FSW_HANDLE handle = fsw_init_session(inotify_monitor_type);
    fsw_add_path(handle, "./out.lags");
    fsw_set_callback(handle, makeSpec, data);
-printf("here\n");
 #endif
 #ifdef USE_INOTIFY
    fd = inotify_init();

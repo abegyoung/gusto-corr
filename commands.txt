@@ -1,5 +1,13 @@
 #!python
 
+# Pixel <-> IP Mapping
+192.168.1.201   B1  M2, M3, M4, M6      ACS 1
+192.168.1.202   OFF                     ACS 2
+192.168.1.203   B2  M2, M3, M5, M8      ACS 3
+192.168.1.204   B2  M6, B3(M2 M3 M5)    ACS 4
+192.168.1.205   OFF                     ACS 5
+192.168.1.206   B3  M5, M6, M7, M8      ACS 6
+
 # remote shell to spectrometer
 ssh -oKexAlgorithms=diffie-hellman-group1-sha1 -oHostKeyAlgorithms=+ssh-dss root@192.168.1.201
 

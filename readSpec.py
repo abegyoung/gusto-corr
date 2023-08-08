@@ -68,6 +68,7 @@ cmd=b'\x0a\x00\x00\x00\x06\x01\x00\x00\x00'+DEV+b'\x00\x00\x00\x00'
 print(cmd)
 s.send(cmd)
 bytes_to_get=int.from_bytes(recv_len(s, 4), byteorder='little') + 4
+print(bytes_to_get)
 #read another 5 bytes 0x06 cmd readback data
 data=recv_len(s, 5)
 #read 8300 bytes of header and lags (for 512 lags)

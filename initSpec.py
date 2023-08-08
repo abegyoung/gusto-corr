@@ -6,15 +6,15 @@ import socket
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-n", "--lags", help="number of lags", default="512")
-parser.add_argument("-d", "--dev", help="HIFAS #", default="1")
-parser.add_argument("-ip", "--serverip", help="correlator IP address", default="192.168.1.201")
-parser.add_argument("-i", "--intTime", help="integration time (usec)", default="250000")
-parser.add_argument("-p", "--path", help="PATH", default="/var/tmp")
-parser.add_argument("-f", "--fname", help="FILENAME", default="default")
-parser.add_argument("-off", "--off", help="turn off ACS PWR", action='store_true')
-parser.add_argument("-s", "--save", help="Save spectra", default='0')
-parser.add_argument("-t", "--tftp", help="Use TFTP", default='0')
+parser.add_argument("-n", "--lags", help="\tNumber of lags", default="512")
+parser.add_argument("-d", "--dev", help="\tHIFAS #", default="1")
+parser.add_argument("-ip", "--serverip", help="\tcorrelator IP address", default="192.168.1.201")
+parser.add_argument("-i", "--intTime", help="\tintegration time (usec)", default="250000")
+parser.add_argument("-p", "--path", help="\tPATH", default="/var/tmp")
+parser.add_argument("-f", "--fname", help="\tFILENAME", default="default")
+parser.add_argument("-off", "--off", help="\tturn off ACS PWR", action='store_true')
+parser.add_argument("-s", "--save", help="\tSave spectra", default='0')
+parser.add_argument("-t", "--tftp", help="\tUse TFTP", default='0')
 args = parser.parse_args()
 
 dev=int(args.dev)
@@ -34,6 +34,7 @@ tftp=args.tftp
 #connect socket
 s=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect((serverip, 9734))
+
 
 #ACS Power
 if args.off:
@@ -104,5 +105,6 @@ print(data)
 #time.sleep(0.2)
 #data=s.recv(100)
 #print(data)
+
 
 s.close()

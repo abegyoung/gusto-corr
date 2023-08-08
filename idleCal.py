@@ -1,4 +1,4 @@
-#!/opt/local/bin/python3.10
+#!/usr/bin/python3
 import ctypes
 import sys
 import time
