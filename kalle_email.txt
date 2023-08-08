@@ -1,0 +1,29 @@
+Hi Abe,
+ 
+I managed to get a GUSTO-equivalent spectrometer up and running here today.
+I can reproduce your small data files here, it is a bug in the C-software. I have patched it on the machine here and it gives 800k datafiles now (with full resolution on the HIFAS).
+I have compiled a patched binary app that you can test, it is attached as zip to this email.
+ 
+I also fixed the "ACS_SETUP" return bytes so that tftp_upload flag in byte 3 is also sent back.
+To solve the catchup problem I've added a buffer clear on ACS_ABORT command. Let me know if this works for you.
+ 
+ 
+To test it I propose the following:
+Mount a NFS share using the phrase outlined in /flash/rc.local
+Run the gusto binary from the NFS with the same flags as /flash/rc.local, i.e.
+gusto --unit 2 --fs 4500 --lags 512 --K2V1 6285.8 --M2V1 2080 &
+ 
+Run your scripts to set up the measurement with filename, path/tftp destination, power on correlator and trigger the integration.
+Check the data files.
+ 
+ 
+If you are happy with the changes:
+Move original binary - mv /flash/gusto /flash/gusto_factory (there should be ample room in the flash to keep the original, and we can revert if something goes wrong)
+Copy new binary to /flash - cp /mnt/gusto /flash
+ 
+Reboot spectrometer to see that it runs from the new binary in flash.
+ 
+ 
+ 
+Best regards,
+Kalle
