@@ -27,3 +27,16 @@ Reboot spectrometer to see that it runs from the new binary in flash.
  
 Best regards,
 Kalle
+
+
+
+Abe's Edits: small deltas.  
+1) The gusto_factory is currently in /usr/bin on our spectrometers.  Move to flash to store.
+2) rc.local will look in /usr/bin to start gusto, put full path to /flash/gusto to run the new one.
+
+Should get this with the old one:
+GUSTO spectrometer software, TRUNK (Feb 10 2020, 10:44:57)
+
+Should get this with the new one:
+GUSTO spectrometer software, TRUNK (Mar 14 2023, 17:56:01)
+
