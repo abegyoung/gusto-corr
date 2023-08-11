@@ -63,7 +63,6 @@ elif (int(lags)==128):
 for a in range(*devlist):
   DEV=a.to_bytes(1, byteorder='little')
   cmd=b'\x0c\x00\x00\x00'+b'\x81\x03\x00\x00\x00'+DEV+LAG+TFTP+b'\x00\x00\x00\x00'
-  print(cmd)
   s.send(cmd)
   time.sleep(0.2)
   data=s.recv(100)

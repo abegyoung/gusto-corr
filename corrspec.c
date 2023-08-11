@@ -9,7 +9,6 @@
 #include <arpa/inet.h>
 #include <ctype.h>
 #include <string.h>
-#include "dict.h"
 #include <sys/types.h>
 #include "corrspec.h"
 
@@ -25,10 +24,8 @@ struct Spectrum
 struct Spectrum spec[4];
 
 int i,N;
-FILE *fin;
+FILE *fp;
 FILE *fout;
-char *key;
-char *value;
 double P_I;
 double P_Q;
 
@@ -61,7 +58,6 @@ struct corrType corr;
   struct timeval begin, hashdone, end;
   gettimeofday(&begin, 0);
 
-
    int NBYTES;
 
    float VQhi;
@@ -72,34 +68,36 @@ struct corrType corr;
    int32_t *Rn;
    int32_t *Rn2;
 
-   // read 27 lines of key value header
-   HashTable *ht = create_table(CAPACITY);
+   //Open file and read header
+   fp = fopen("default_0000.dat", "r");
 
-   key = malloc(MAX_STR_LEN);
-   value = malloc(MAX_STR_LEN);
+   int32_t value;
+   int32_t header[21];
+   const char *header_names[]={"UNIT", "DEV", "NINT", "UNIXTIME", "CPU", "NBYTES", "CORRTIME", "EMPTY", \
+                "Ihigh", "Qhigh", "Ilow", "Qlow", "Ierr", "Qerr", \
+                "EMPTY", "EMPTY","EMPTY","EMPTY","EMPTY","EMPTY","EMPTY","EMPTY"};
 
-   //usleep(100000);
-   fin = fopen("out.lags", "r");
-   for(i=0; i<27; i++){
-     fscanf(fin, "%s %s\n", key, value);
-     ht_insert(ht, key, value);
+   for(int i=0; i<22; i++){
+     if(i==3)
+       fread(&value, 4, 2, fp); //UNIXTIME if 64 bits
+     else
+       fread(&value, 4, 1, fp);
+
+     header[i] = (value);
+     printf("%s is %lu\n", header_names[i], header[i]);
    }
 
-
-
-
-   // fill variables from hash table
-   corr.corrtime = atoi(ht_search(ht, (char *) "CORRTIME"));
-   NBYTES   = atoi(ht_search(ht, (char *) "NBYTES"));
-   corr.Qhi = atoi(ht_search(ht, (char *) "Qhigh" ));
-   corr.Ihi = atoi(ht_search(ht, (char *) "Ihigh" ));
-   corr.Qlo = atoi(ht_search(ht, (char *) "Qlow"  ));
-   corr.Ilo = atoi(ht_search(ht, (char *) "Ilow"  ));
-   VQhi     = atof(ht_search(ht, (char *) "VQhi"  ));
-   VIhi     = atof(ht_search(ht, (char *) "VIhi"  ));
-   VQlo     = atof(ht_search(ht, (char *) "VQlo"  ));
-   VIlo     = atof(ht_search(ht, (char *) "VIlo"  ));
-
+   // fill variables from header array
+   NBYTES        = header[5];
+   corr.corrtime = header[6];
+   corr.Ihi = header[8];
+   corr.Qhi = header[9];
+   corr.Ilo = header[10];
+   corr.Qlo = header[11];
+   VQhi     = 2.0;
+   VIhi     = 2.0;
+   VQlo     = 1.0;
+   VIlo     = 1.0;
 
    //timing
    gettimeofday(&hashdone, 0);
@@ -129,9 +127,16 @@ struct corrType corr;
 
    // Read lags
    for(i  =0; i<N; i+=1){
-     fscanf(fin, "%d %d %d %d\n", &corr.II[i], &corr.IQ[i], &corr.QI[i], &corr.QQ[i]);
+     fread(&value, 4, 1, fp);
+     corr.II[i] = (value);
+     fread(&value, 4, 1, fp);
+     corr.IQ[i] = (value);
+     fread(&value, 4, 1, fp);
+     corr.QI[i] = (value);
+     fread(&value, 4, 1, fp);
+     corr.QQ[i] = (value);
    }
-   fclose(fin);            
+   fclose(fp);            
 
 // Combine IQ lags into R[]
    for(i=0; i<(2*N); i++){
@@ -165,16 +170,14 @@ struct corrType corr;
 
 // Cleanup
    //DEBUG
-   printf("UNIXTIME is %s\n", ht_search(ht, (char *) "UNIXTIME"));
-   printf("DEV is %s\n", ht_search(ht, (char *) "DEV"));
+   printf("UNIXTIME is %lu\n", 0);
+   printf("UNIT is %lu\n", header[0]);
+   printf("DEV is %lu\n", header[1]);
    printf("%.2f %.2f %.2f %.2f\n", (double)corr.Qhi/(double)corr.corrtime, (double)corr.Ihi/(double)corr.corrtime, (double)corr.Qlo/(double)corr.corrtime, (double)corr.Ilo/(double)corr.corrtime);
-   printf("nlags=%d\n", N);
+   printf("nlags=%lu\n", N);
    printf("etaQ %.3f\n", 1/sqrt(P_I*P_Q));
 
-   free_table(ht);
    fclose(fout);
-   free(key);
-   free(value);
 
    gettimeofday(&end, 0);
    long seconds = hashdone.tv_sec - begin.tv_sec;
@@ -212,9 +215,10 @@ int main(int argc, char **argv){
    /* Initialize fswatch or inotify */
 #ifdef USE_FSWATCH
    fsw_init_library();
-   const FSW_HANDLE handle = fsw_init_session(fsevents_monitor_type);
-   //const FSW_HANDLE handle = fsw_init_session(inotify_monitor_type);
-   fsw_add_path(handle, "./out.lags");
+   const FSW_HANDLE handle = fsw_init_session(fsevents_monitor_type); //MacOSX
+   //const FSW_HANDLE handle = fsw_init_session(inotify_monitor_type);  //Linux
+   //const FSW_HANDLE handle = fsw_init_session(kqueue_monitor_type);     //BSD
+   fsw_add_path(handle, "./default_0000.dat");
    fsw_set_callback(handle, makeSpec, data);
 #endif
 #ifdef USE_INOTIFY
