@@ -215,9 +215,9 @@ int main(int argc, char **argv){
    /* Initialize fswatch or inotify */
 #ifdef USE_FSWATCH
    fsw_init_library();
-   const FSW_HANDLE handle = fsw_init_session(fsevents_monitor_type); //MacOSX
+   //const FSW_HANDLE handle = fsw_init_session(fsevents_monitor_type); //MacOSX
    //const FSW_HANDLE handle = fsw_init_session(inotify_monitor_type);  //Linux
-   //const FSW_HANDLE handle = fsw_init_session(kqueue_monitor_type);     //BSD
+   const FSW_HANDLE handle = fsw_init_session(kqueue_monitor_type);     //BSD
    fsw_add_path(handle, "./default_0000.dat");
    fsw_set_callback(handle, makeSpec, data);
 #endif
