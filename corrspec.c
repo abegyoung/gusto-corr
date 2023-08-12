@@ -1,3 +1,4 @@
+#include <dirent.h>
 #include <math.h>
 #include <sys/time.h>
 #include <it/math.h>
@@ -69,8 +70,37 @@ struct corrType corr;
    int32_t *Rn2;
 
    //Open file and read header
-   fp = fopen("default_0000.dat", "r");
+   char str1[5];
+   char str2[5];
+   char last[80];
+   char file_in_name[80];
+   DIR *dp;
+   struct dirent *ep;
+   dp = opendir("/mnt/data/ACS3");
+   if (dp != NULL) {
+     while ((ep = readdir (dp)) != NULL){
+       sprintf(last, "%s", ep->d_name);
+       puts(ep->d_name);
+     }
 
+     closedir(dp);
+   }
+   else
+   {
+     perror("Couldn't open directory");
+   }
+   sprintf(file_in_name, "/mnt/data/ACS3/default_");
+   strncpy(str1, last+8, 8);
+   int num=atoi(str1);
+   snprintf(str2, sizeof(str2), "%04d", num-1);
+
+   strcat(file_in_name, str2);
+   strcat(file_in_name, ".dat");
+
+printf("opening %s\n", file_in_name);
+    
+   //Open file and read header
+   fp = fopen(file_in_name, "r");
    int32_t value;
    int32_t header[21];
    const char *header_names[]={"UNIT", "DEV", "NINT", "UNIXTIME", "CPU", "NBYTES", "CORRTIME", "EMPTY", \
@@ -86,7 +116,7 @@ struct corrType corr;
          fread(&value, 4, 1, fp);
   
        header[i] = (value);
-       printf("%s is %lu\n", header_names[i], header[i]);
+       //printf("%s is %lu\n", header_names[i], header[i]);
      }
   
      // fill variables from header array
@@ -224,15 +254,15 @@ int main(int argc, char **argv){
    /* Initialize fswatch or inotify */
 #ifdef USE_FSWATCH
    fsw_init_library();
-   const FSW_HANDLE handle = fsw_init_session(fsevents_monitor_type); //MacOSX
+   //const FSW_HANDLE handle = fsw_init_session(fsevents_monitor_type); //MacOSX
    //const FSW_HANDLE handle = fsw_init_session(inotify_monitor_type);  //Linux
-   //const FSW_HANDLE handle = fsw_init_session(kqueue_monitor_type);     //BSD
-   fsw_add_path(handle, "./default_0000.dat");
+   const FSW_HANDLE handle = fsw_init_session(kqueue_monitor_type);     //BSD
+   fsw_add_path(handle, "/mnt/data/ACS3");
    fsw_set_callback(handle, makeSpec, data);
 #endif
 #ifdef USE_INOTIFY
    fd = inotify_init();
-   wd = inotify_add_watch(fd, "./out.lags", IN_CLOSE_WRITE);
+   wd = inotify_add_watch(fd, "/mnt/data/ACS3", IN_CLOSE_WRITE);
 #endif
 
    while(1){
