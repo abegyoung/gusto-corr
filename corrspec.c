@@ -77,96 +77,105 @@ struct corrType corr;
                 "Ihigh", "Qhigh", "Ilow", "Qlow", "Ierr", "Qerr", \
                 "EMPTY", "EMPTY","EMPTY","EMPTY","EMPTY","EMPTY","EMPTY","EMPTY"};
 
-   for(int i=0; i<22; i++){
-     if(i==3)
-       fread(&value, 4, 2, fp); //UNIXTIME if 64 bits
-     else
+   for(int j=0; j<100; j++){
+
+     for(int i=0; i<22; i++){
+       if(i==3)
+         fread(&value, 4, 2, fp); //UNIXTIME if 64 bits
+       else
+         fread(&value, 4, 1, fp);
+  
+       header[i] = (value);
+       printf("%s is %lu\n", header_names[i], header[i]);
+     }
+  
+     // fill variables from header array
+     NBYTES        = header[5];
+     corr.corrtime = header[6];
+     corr.Ihi = header[8];
+     corr.Qhi = header[9];
+     corr.Ilo = header[10];
+     corr.Qlo = header[11];
+     VQhi     = 2.0;
+     VIhi     = 2.0;
+     VQlo     = 1.0;
+     VIlo     = 1.0;
+
+     //timing
+     gettimeofday(&hashdone, 0);
+
+     //usleep(1000);
+
+     char filename[80];
+     sprintf(filename, "spectra_files/spec_UNIT%d_DEV%d_NINT%d.dat", header[0], header[1], header[2]);
+     fout = fopen(filename, "w");
+
+     //read human readable "Number of Lags"
+     if (NBYTES==8256)
+       N = 512;
+     else if (NBYTES==6208)
+       N = 384;
+     else if (NBYTES==4160)
+       N = 256;
+     else if (NBYTES==2112)
+       N = 128;
+     int specA = (int) N/128 - 1;
+
+     //First byte is Correlator STATUS
+     corr.QI  = malloc(N*sizeof(int32_t));
+     corr.II  = malloc(N*sizeof(int32_t));
+     corr.QQ  = malloc(N*sizeof(int32_t));
+     corr.IQ  = malloc(N*sizeof(int32_t));
+     Rn  = malloc(2*N*sizeof(int32_t));
+     Rn2 = malloc(4*N*sizeof(int32_t));
+
+     // Read lags
+     for(i  =0; i<N; i+=1){
        fread(&value, 4, 1, fp);
+       corr.II[i] = (value);
+       fread(&value, 4, 1, fp);
+       corr.IQ[i] = (value);
+       fread(&value, 4, 1, fp);
+       corr.QI[i] = (value);
+       fread(&value, 4, 1, fp);
+       corr.QQ[i] = (value);
+     }
 
-     header[i] = (value);
-     printf("%s is %lu\n", header_names[i], header[i]);
+  // Combine IQ lags into R[]
+     for(i=0; i<(2*N); i++){
+        if(i%2 == 0) Rn[i] = corr.II[i/2] + corr.QQ[i/2];
+        if(i%2 == 1) Rn[i] = corr.IQ[(i-1)/2] + corr.QI[1+(i-1)/2];
+     }
+     Rn[2*N] = corr.IQ[(N-1)/2] + corr.QI[(N-1)/2];
+
+  // Mirror R[] symmetrically
+     for(i=0; i<4*N; i++){
+       if(i<(2*N-1)) Rn2[i] = Rn[(2*N-1)-i];
+       else Rn2[i] = Rn[i-(2*N-1)];
+     }
+
+  // Fill fft struct
+     for(i=0; i<4*N-1; i++){
+       spec[specA].in[i][0] = Rn2[i]*0.5*(1-cos(2*PI*i/((4*N)-2)));	//real with Hann window
+       spec[specA] .in[i][1] = 0.;					//imag
+     }
+
+  // Do FFT and print
+     fftw_execute(spec[specA].p);
+
+     P_I = pow((VIhi-VIlo),2) * 1.8197 / pow((erfinv(1-2*(double)corr.Ihi/(double)corr.corrtime)) + (erfinv(1-2*(double)corr.Ilo/(double)corr.corrtime)),2);
+     P_Q = pow((VQhi-VQlo),2) * 1.8197 / pow((erfinv(1-2*(double)corr.Qhi/(double)corr.corrtime)) + (erfinv(1-2*(double)corr.Qlo/(double)corr.corrtime)),2);
+
+
+     //Print in counts per second (assuming 4700
+     for(i=0; i<2*N; i++)
+       fprintf(fout, "%d\t%lf\n", (4500*i)/(2*N), (4500.*1000000.)/(corr.corrtime*256.)*sqrt(P_I*P_Q)*sqrt(fabs(spec[specA].out[i][0]*(-1*spec[specA].out[i][1]))) );
+
+     fclose(fout); //close single spectra file
+
    }
 
-   // fill variables from header array
-   NBYTES        = header[5];
-   corr.corrtime = header[6];
-   corr.Ihi = header[8];
-   corr.Qhi = header[9];
-   corr.Ilo = header[10];
-   corr.Qlo = header[11];
-   VQhi     = 2.0;
-   VIhi     = 2.0;
-   VQlo     = 1.0;
-   VIlo     = 1.0;
-
-   //timing
-   gettimeofday(&hashdone, 0);
-
-   //usleep(1000);
-
-   fout = fopen("out.spec", "w");
-
-   //read human readable "Number of Lags"
-   if (NBYTES==8256)
-     N = 512;
-   else if (NBYTES==6208)
-     N = 384;
-   else if (NBYTES==4160)
-     N = 256;
-   else if (NBYTES==2112)
-     N = 128;
-   int specA = (int) N/128 - 1;
-
-   //First byte is Correlator STATUS
-   corr.QI  = malloc(N*sizeof(int32_t));
-   corr.II  = malloc(N*sizeof(int32_t));
-   corr.QQ  = malloc(N*sizeof(int32_t));
-   corr.IQ  = malloc(N*sizeof(int32_t));
-   Rn  = malloc(2*N*sizeof(int32_t));
-   Rn2 = malloc(4*N*sizeof(int32_t));
-
-   // Read lags
-   for(i  =0; i<N; i+=1){
-     fread(&value, 4, 1, fp);
-     corr.II[i] = (value);
-     fread(&value, 4, 1, fp);
-     corr.IQ[i] = (value);
-     fread(&value, 4, 1, fp);
-     corr.QI[i] = (value);
-     fread(&value, 4, 1, fp);
-     corr.QQ[i] = (value);
-   }
-   fclose(fp);            
-
-// Combine IQ lags into R[]
-   for(i=0; i<(2*N); i++){
-      if(i%2 == 0) Rn[i] = corr.II[i/2] + corr.QQ[i/2];
-      if(i%2 == 1) Rn[i] = corr.IQ[(i-1)/2] + corr.QI[1+(i-1)/2];
-   }
-   Rn[2*N] = corr.IQ[(N-1)/2] + corr.QI[(N-1)/2];
-
-// Mirror R[] symmetrically
-   for(i=0; i<4*N; i++){
-     if(i<(2*N-1)) Rn2[i] = Rn[(2*N-1)-i];
-     else Rn2[i] = Rn[i-(2*N-1)];
-   }
-
-// Fill fft struct
-   for(i=0; i<4*N-1; i++){
-     spec[specA].in[i][0] = Rn2[i]*0.5*(1-cos(2*PI*i/((4*N)-2)));	//real with Hann window
-     spec[specA] .in[i][1] = 0.;					//imag
-   }
-
-// Do FFT and print
-   fftw_execute(spec[specA].p);
-
-   P_I = pow((VIhi-VIlo),2) * 1.8197 / pow((erfinv(1-2*(double)corr.Ihi/(double)corr.corrtime)) + (erfinv(1-2*(double)corr.Ilo/(double)corr.corrtime)),2);
-   P_Q = pow((VQhi-VQlo),2) * 1.8197 / pow((erfinv(1-2*(double)corr.Qhi/(double)corr.corrtime)) + (erfinv(1-2*(double)corr.Qlo/(double)corr.corrtime)),2);
-
-
-   //Print in counts per second (assuming 4700
-   for(i=0; i<2*N; i++)
-     fprintf(fout, "%d\t%lf\n", (4500*i)/(2*N), (4500.*1000000.)/(corr.corrtime*256.)*sqrt(P_I*P_Q)*sqrt(fabs(spec[specA].out[i][0]*(-1*spec[specA].out[i][1]))) );
+   fclose(fp);     //close ACS spectrometer lag file       
 
 // Cleanup
    //DEBUG
@@ -177,8 +186,8 @@ struct corrType corr;
    printf("nlags=%lu\n", N);
    printf("etaQ %.3f\n", 1/sqrt(P_I*P_Q));
 
-   fclose(fout);
 
+   
    gettimeofday(&end, 0);
    long seconds = hashdone.tv_sec - begin.tv_sec;
    long microseconds = hashdone.tv_usec - begin.tv_usec;
@@ -215,9 +224,9 @@ int main(int argc, char **argv){
    /* Initialize fswatch or inotify */
 #ifdef USE_FSWATCH
    fsw_init_library();
-   //const FSW_HANDLE handle = fsw_init_session(fsevents_monitor_type); //MacOSX
+   const FSW_HANDLE handle = fsw_init_session(fsevents_monitor_type); //MacOSX
    //const FSW_HANDLE handle = fsw_init_session(inotify_monitor_type);  //Linux
-   const FSW_HANDLE handle = fsw_init_session(kqueue_monitor_type);     //BSD
+   //const FSW_HANDLE handle = fsw_init_session(kqueue_monitor_type);     //BSD
    fsw_add_path(handle, "./default_0000.dat");
    fsw_set_callback(handle, makeSpec, data);
 #endif
