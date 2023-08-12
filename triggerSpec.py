@@ -33,7 +33,10 @@ def recv_len(the_socket, length):
     bytes_recd = bytes_recd + len(chunk)
   return b''.join(chunks)
 
-MASK=(1<<(dev-1)).to_bytes(1, byteorder='little')
+if (dev==0):
+  MASK=(15).to_bytes(1, byteorder='little')
+else:
+  MASK=(1<<(dev-1)).to_bytes(1, byteorder='little')
 #TRIGGER               CMD LEN              MASK
 cmd=b'\x0a\x00\x00\x00\x83\x01\x00\x00\x00'+MASK+b'\x00\x00\x00\x00'
 s.send(cmd)
