@@ -76,11 +76,11 @@ struct corrType corr;
    char file_in_name[80];
    DIR *dp;
    struct dirent *ep;
-   dp = opendir("/mnt/data/ACS3");
+   dp = opendir("/mnt/data/ACS6");
    if (dp != NULL) {
      while ((ep = readdir (dp)) != NULL){
        sprintf(last, "%s", ep->d_name);
-       puts(ep->d_name);
+       //puts(ep->d_name);
      }
 
      closedir(dp);
@@ -89,7 +89,7 @@ struct corrType corr;
    {
      perror("Couldn't open directory");
    }
-   sprintf(file_in_name, "/mnt/data/ACS3/default_");
+   sprintf(file_in_name, "/mnt/data/ACS6/default_");
    strncpy(str1, last+8, 8);
    int num=atoi(str1);
    snprintf(str2, sizeof(str2), "%04d", num-1);
@@ -257,12 +257,12 @@ int main(int argc, char **argv){
    //const FSW_HANDLE handle = fsw_init_session(fsevents_monitor_type); //MacOSX
    //const FSW_HANDLE handle = fsw_init_session(inotify_monitor_type);  //Linux
    const FSW_HANDLE handle = fsw_init_session(kqueue_monitor_type);     //BSD
-   fsw_add_path(handle, "/mnt/data/ACS3");
+   fsw_add_path(handle, "/mnt/data/ACS6");
    fsw_set_callback(handle, makeSpec, data);
 #endif
 #ifdef USE_INOTIFY
    fd = inotify_init();
-   wd = inotify_add_watch(fd, "/mnt/data/ACS3", IN_CLOSE_WRITE);
+   wd = inotify_add_watch(fd, "/mnt/data/ACS6", IN_CLOSE_WRITE);
 #endif
 
    while(1){

@@ -1,4 +1,9 @@
+CXX := gcc
+CXXFLAGS :=
+INCLUDES := -I/usr/local/include -I/usr/pkg/include
+LIBS := -L/usr/pkg/lib -L/usr/local/lib -lm -lc -lfftw3 -lit -lfswatch -DUSE_FSWATCH
+
 corrspec: corrspec.c
-	gcc -o corrspec corrspec.c -g -I./ -I/usr/include -I/opt/local/include -I/usr/include/arm-linux-gnueabihf -L./ -L/opt/local/lib -lm -lc -lfftw3 -lit -lfswatch -DUSE_FSWATCH
+	$(CXX) -o corrspec corrspec.c $(INCLUDES) $(CXXFLAGS) $(LIBS)
 
 all: corrspec

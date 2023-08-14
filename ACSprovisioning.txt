@@ -1,3 +1,4 @@
+203
 # GUSTO spectrometer               
 # Local configuration script       
 # Unit: 004 FM                     
@@ -10,4 +11,47 @@
 #                                                              
 mount -o nolock,rsize=1024 192.168.1.11:/mnt/data/ACS3 /var/tmp
 /flash/gusto --unit 4 --fs 5500 --lags 1024 --K2V1 10034.8 --M2V1 3269.0 &
+
+204
+# GUSTO spectrometer
+# Local configuration script
+# Unit: 005 FM
+# Defaults:
+#       IP-address (static)
+#       FS 5500 MHz
+#       lags 1024
+#       K2V1 10058.6
+#       M2V1 3289.4
+#
+mount -o nolock,rsize=1024 192.168.1.11:/mnt/data/ACS4 /var/tmp        
+/flash/gusto --unit 5 --fs 5500 --lags 1024 --K2V1 10058.6 --M2V1 3289.4 &
+
+205
+# GUSTO spectrometer
+# Local configuration script
+# Unit: 006 FM
+# Defaults:
+#       IP-address (static)
+#       FS 5500 MHz
+#       lags 512
+#       K2V1 5988.5
+#       M2V1 1971.3
+#
+mount -o nolock,rsize=1024 192.168.1.11:/mnt/data/ACS5 /var/tmp
+/flash/gusto --unit 6 --fs 5500 --lags 512 --K2V1 5988.5 --M2V1 1971.3 &
+
+206
+# GUSTO spectrometer
+# Local configuration script
+# Unit: 007 FM
+# Defaults:
+#       IP-address (static)
+#       FS 5500 MHz
+#       lags 512
+#       K2V1 9919.6
+#       M2V1 3302.4
+#
+mount -o nolock,rsize=1024 192.168.1.22:/mnt/data/ACS6 /var/tmp        
+/flash/gusto --unit 7 --fs 5500 --lags 512 --K2V1 9919.6 --M2V1 3302.4 &
+
 
