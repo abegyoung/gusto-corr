@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 import sys
 import time
 import ctypes
@@ -10,7 +10,7 @@ import subprocess
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-d", "--dev", help="HIFAS #", default="1")
-parser.add_argument("-ip", "--serverip", help="correlator IP address", default="192.168.1.201")
+parser.add_argument("-ip", "--serverip", help="correlator IP address", default="192.168.1.203")
 parser.add_argument("-r", "--read", help="read back spectra <0|1>", default="1")
 args = parser.parse_args()
 
