@@ -1,9 +1,0 @@
-CXX := gcc
-CXXFLAGS :=
-INCLUDES := -I/usr/local/include -I/usr/pkg/include -I./
-LIBS := -Wl,-rpath,/usr/local/lib -lit -L/usr/pkg/lib -L/usr/local/lib -lm -lfftw3 -lfswatch -DUSE_FSWATCH
-
-corrspec: corrspec.c
-	$(CXX) -o corrspec corrspec.c $(INCLUDES) $(CXXFLAGS) $(LIBS)
-
-all: corrspec

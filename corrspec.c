@@ -16,10 +16,7 @@
 
 #define PI 3.14159
 
-int flag = 0;//1<<2;
-struct fsw_event_type_filter cevent_filter;
 
-//void printDateTimeFromEpoch(long long epochSeconds){
 void printDateTimeFromEpoch(time_t ts){
 
 	struct tm *tm = gmtime(&ts);
