@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 import sys
 import time
 import ctypes
@@ -66,7 +66,7 @@ data=recv_len(s, bytes_to_get)
 fifo=0
 while (fifo==0):
   #      LEN             CMD LEN             (==============)
-  cmd=b'\x09\x00\x00\x00\x05\x00\x00\x00\x00\x00\x00\x00\x00')
+  cmd=b'\x09\x00\x00\x00\x05\x00\x00\x00\x00\x00\x00\x00\x00'
   s.send(cmd)
   bytes_to_get=int.from_bytes(recv_len(s, 4), byteorder='little')
   data=recv_len(s, bytes_to_get)
@@ -86,12 +86,12 @@ data=recv_len(s, 5)
 data=recv_len(s, bytes_to_get-9)
 
 #save binary output
-#fp=open("lags.bin", "wb")
-#fp.write(data)
-#fp.close()
+fp=open("lags.bin", "wb")
+fp.write(data)
+fp.close()
 
 #save text output
-fp=open("out0.lags", "w")
+fp=open("out.lags", "w")
 print("FIFO",fifo,file=fp)
 
 #remaining 8300 bytes are header and lags
@@ -162,5 +162,3 @@ for i in range(0,NLAGS):
 
 s.close()
 fp.close()
-subprocess.run(
-        ['mv', 'out0.lags', 'out.lags'], stdout=subprocess.PIPE).stdout.decode('utf-8')

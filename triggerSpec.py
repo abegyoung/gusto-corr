@@ -8,6 +8,17 @@ import argparse
 from datetime import datetime
 import subprocess
 
+def recv_len(the_socket, length):
+  chunks = []
+  bytes_recd = 0
+  while bytes_recd < length:
+    chunk = the_socket.recv(min(length - bytes_recd, 2048))
+    if chunk == b'':
+      raise RuntimeError("socket broken")
+    chunks.append(chunk)
+    bytes_recd = bytes_recd + len(chunk)
+  return b''.join(chunks)
+
 parser = argparse.ArgumentParser()
 parser.add_argument("-d", "--dev", help="HIFAS #", default="1")
 parser.add_argument("-ip", "--serverip", help="correlator IP address", default="192.168.1.203")
@@ -21,17 +32,6 @@ serverip=args.serverip
 #connect socket
 s=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect((serverip, 9734))
-
-def recv_len(the_socket, length):
-  chunks = []
-  bytes_recd = 0
-  while bytes_recd < length:
-    chunk = the_socket.recv(min(length - bytes_recd, 2048))
-    if chunk == b'':
-      raise RuntimeError("socket broken")
-    chunks.append(chunk)
-    bytes_recd = bytes_recd + len(chunk)
-  return b''.join(chunks)
 
 if (dev==0):
   MASK=(15).to_bytes(1, byteorder='little')

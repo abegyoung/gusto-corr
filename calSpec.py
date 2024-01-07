@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 import sys
 import time
 import ctypes
@@ -30,17 +30,6 @@ serverip=args.serverip
 #connect socket
 s=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect((serverip, 9734))
-
-def recv_len(the_socket, length):
-  chunks = []
-  bytes_recd = 0
-  while bytes_recd < length:
-    chunk = the_socket.recv(min(length - bytes_recd, 2048))
-    if chunk == b'':
-      raise RuntimeError("socket broken")
-    chunks.append(chunk)
-    bytes_recd = bytes_recd + len(chunk)
-  return b''.join(chunks)
 
 #AUTO CAL              CMD LEN              DEV    NUM
 cmd=b'\x0b\x00\x00\x00\x87\x02\x00\x00\x00'+DEV+b'\x14\x00\x00\x00\x00'

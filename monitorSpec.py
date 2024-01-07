@@ -9,16 +9,6 @@ from datetime import datetime
 import subprocess
 from collections import namedtuple
 
-parser = argparse.ArgumentParser()
-parser.add_argument("-ip", "--serverip", help="correlator IP address", default="192.168.1.201")
-args = parser.parse_args()
-
-serverip=args.serverip
-
-#connect socket
-s=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect((serverip, 9734))
-
 def recv_len(the_socket, length):
   chunks = []
   bytes_recd = 0
@@ -29,6 +19,16 @@ def recv_len(the_socket, length):
     chunks.append(chunk)
     bytes_recd = bytes_recd + len(chunk)
   return b''.join(chunks)
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-ip", "--serverip", help="correlator IP address", default="192.168.1.201")
+args = parser.parse_args()
+
+serverip=args.serverip
+
+#connect socket
+s=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect((serverip, 9734))
 
 #READ CAL              CMD LEN             SUF
 cmd=b'\x09\x00\x00\x00\x0C\x00\x00\x00\x00\x00\x00\x00\x00'
@@ -62,7 +62,5 @@ v = Volts._make(corrhk[1::2])
 
 for i in range(0,N,2):
   print("{}".format(corrhk[i]), "{:.3f}".format(float(corrhk[i+1][1:-2])))
-
-
 
 s.close()

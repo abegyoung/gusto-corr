@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 import ctypes
 import sys
 import time
@@ -20,13 +20,13 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-n", "--lags", help="\tNumber of lags", default="512")
 parser.add_argument("-d", "--dev", help="\tHIFAS #", default="1")
 parser.add_argument("-ip", "--serverip", help="\tcorrelator IP address", default="192.168.1.203")
-parser.add_argument("-i", "--intTime", help="\tintegration time (usec)", default="250000")
-parser.add_argument("-p", "--path", help="\tPATH", default="/var/tmp")
+parser.add_argument("-i", "--intTime", help="\tintegration time (usec)", default="100000")
+parser.add_argument("-p", "--path", help="\tPATH", default="192.168.1.11")
 parser.add_argument("-f", "--fname", help="\tFILENAME", default="default")
-parser.add_argument("-off", "--off", help="\tturn off ACS PWR", action='store_true')
-parser.add_argument("-s", "--save", help="\tSave spectra", default='0')
-parser.add_argument("-t", "--tftp", help="\tUse TFTP", default='0')
+parser.add_argument("-s", "--save", help="\tSave spectra", default='1')
+parser.add_argument("-t", "--tftp", help="\tUse TFTP", default='1')
 parser.add_argument("-a", "--auto", help="\tAuto Trigger", default='0')
+parser.add_argument("-off", "--off", help="\tturn off ACS PWR", action='store_true')
 args = parser.parse_args()
 
 dev=int(args.dev)
@@ -48,7 +48,6 @@ auto=int(args.auto)
 s=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect((serverip, 9734))
 
-
 #ACS Power
 if args.off:
   ON=int(0).to_bytes(1, byteorder='little')
@@ -61,7 +60,6 @@ for a in range(*devlist):
   bytes_to_get=int.from_bytes(recv_len(s, 4), byteorder='little')
   data=recv_len(s, bytes_to_get)
   print(data)
-
 
 #ACS Setup
 TFTP=int((int(tftp)<<1)+int(save)).to_bytes(1, byteorder='little')
@@ -97,7 +95,6 @@ for a in range(*devlist):
   data=recv_len(s, bytes_to_get)
   print(data)
 
-
 #Integration Time
 TIME=int(intTime).to_bytes(4, byteorder='little')
 for a in range(*devlist):
@@ -107,7 +104,6 @@ for a in range(*devlist):
   bytes_to_get=int.from_bytes(recv_len(s, 4), byteorder='little')
   data=recv_len(s, bytes_to_get)
   print(data)
-
 
 #Set output PATH
 CMD=b'\x91'
@@ -121,7 +117,6 @@ bytes_to_get=int.from_bytes(recv_len(s, 4), byteorder='little')
 data=recv_len(s, bytes_to_get)
 print(data)
 
-
 #Set output FILENAME
 CMD=b'\x90'
 FNAME=bytes(fname, 'utf-8')+b'\x00\x00'
@@ -133,6 +128,5 @@ s.send(cmd)
 bytes_to_get=int.from_bytes(recv_len(s, 4), byteorder='little')
 data=recv_len(s, bytes_to_get)
 print(data)
-
 
 s.close()

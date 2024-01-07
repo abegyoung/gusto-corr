@@ -19,7 +19,7 @@ def recv_len(the_socket, length):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-d", "--dev", help="HIFAS #", default="1")
-parser.add_argument("-ip", "--serverip", help="correlator IP address", default="192.168.1.201")
+parser.add_argument("-ip", "--serverip", help="correlator IP address", default="192.168.1.203")
 args = parser.parse_args()
 
 dev=int(args.dev)
