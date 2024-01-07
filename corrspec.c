@@ -1,3 +1,4 @@
+
 // main.c
 #include <unistd.h>
 #include <sys/time.h>
@@ -15,15 +16,16 @@
 
 #define PI 3.14159
 
-int flag = 1<<2;
+int flag = 0;//1<<2;
 struct fsw_event_type_filter cevent_filter;
 
-void printDateTimeFromEpoch(long long epochSeconds){
-	time_t epochTime = (time_t)(&epochSeconds);
-	struct tm *timeInfo = gmtime(&epochTime);
+//void printDateTimeFromEpoch(long long epochSeconds){
+void printDateTimeFromEpoch(time_t ts){
+
+	struct tm *tm = gmtime(&ts);
 
 	char buffer[26];
-	strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", timeInfo);
+	strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", tm);
 	printf("UTC Date and Time: %s\n", buffer);
 }
 
@@ -76,6 +78,7 @@ struct corrType corr;
    int UNIT;
    int DEV;
    int NBYTES;
+   int CPU;
    float VQhi;
    float VIhi;
    float VQlo;
@@ -100,7 +103,7 @@ struct corrType corr;
    char *prefix;
    const char *prefix_names[]={"SRC", "REF", "OTF", "HOT", "COLD", "FOC"};
    while ( ptr==NULL ){
-      ptr= strstr(filename, prefix_names[i]);
+      ptr = strstr(filename, prefix_names[i]);
       i++;
    }
    int len = strlen(prefix_names[i-1]);
@@ -108,9 +111,9 @@ struct corrType corr;
    prefix[len] = '\0';
    printf("type is %s\n", prefix);
 
-
    int32_t value;
-   uint64_t value64;
+   uint32_t value1;
+   uint32_t value2;
 
    // figure out how many spectra in the file
    fseek(fp, 24, SEEK_SET);     // go to header position
@@ -129,13 +132,16 @@ struct corrType corr;
 
 //////////////////////////////  LOOP OVER ALL SPECTRA IN FILE  ///////////////////////////////////
 
-   //for(int j=0; j<sz/bps; j++)
+//   for(int j=0; j<sz/bps; j++)
    for(int j=0; j<1; j++)
    {
       for(int i=0; i<22; i++){
          if(i==3){
-            fread(&value64, 4, 2, fp); //UNIXTIME is 64 bits
-            UNIXTIME = htonl(value64);
+            //UNIXTIME is 64 bits
+            fread(&value1, 4, 1, fp); //Least significant 32 bits
+            fread(&value2, 4, 1, fp); //Most significant 32 bis
+            UNIXTIME = (((uint64_t)value2 << 32) | value1 ) / 1000.;
+
          }
          else{
             fread(&value, 4, 1, fp);
@@ -144,15 +150,16 @@ struct corrType corr;
       }
 
       // fill variables from header array
-      UNIT     = header[0];
-      DEV      = header[1];
-      NINT     = header[2];
-      NBYTES   = header[5];
+      UNIT          = header[0];
+      DEV           = header[1];
+      NINT          = header[2];
+      CPU           = header[4];
+      NBYTES        = header[5];
       corr.corrtime = header[6];
-      corr.Ihi = header[8];
-      corr.Qhi = header[9];
-      corr.Ilo = header[10];
-      corr.Qlo = header[11];
+      corr.Ihi      = header[8];
+      corr.Qhi      = header[9];
+      corr.Ilo      = header[10];
+      corr.Qlo      = header[11];
       FILE *calf=fopen("cal.txt", "r");
       fscanf(calf, "%*s %*s %f\n", &VIhi);
       fscanf(calf, "%*s %*s %f\n", &VQhi);
@@ -161,7 +168,7 @@ struct corrType corr;
 
       char filename[255];
 
-      sprintf(filename, "%s_UNIT%d_DEV%d_NINT%d.txt", prefix, header[0], header[1], header[2]);
+      sprintf(filename, "spectra/%s_UNIT%d_DEV%d_NINT%d.txt", prefix, UNIT, DEV, NINT);
       fout = fopen(filename, "w");
 
       //read human readable "Number of Lags"
@@ -241,15 +248,15 @@ struct corrType corr;
       //ouput stats for last spectra in file
       printf("\nUNIXTIME is %" PRIu64 "\n", UNIXTIME);
       printf("CORRTIME is %d\n", (5000.*1000000.)/(corr.corrtime*256.));
-      printDateTimeFromEpoch(UNIXTIME/1000.);
-      printf("UNIT is %lu\n", header[0]);
-      printf("DEV is %lu\n", header[1]);
-      printf("NINT is %lu\n", header[2]);
+      printDateTimeFromEpoch((long long) UNIXTIME);
+      printf("UNIT is %d\n", UNIT);
+      printf("DEV  is %d\n",   DEV); 
+      printf("NINT is %d\n", NINT);
       printf("%.2f %.2f %.2f %.2f\n",  (double)corr.Qhi/(double)corr.corrtime, \
                                        (double)corr.Ihi/(double)corr.corrtime, \
                                        (double)corr.Qlo/(double)corr.corrtime, \
                                        (double)corr.Ilo/(double)corr.corrtime);
-      printf("nlags=%lu\n", N);
+      printf("nlags=%d\n", N);
       printf("etaQ %.3f\n", 1/sqrt(P_I*P_Q));
 
       //timing
@@ -298,8 +305,8 @@ int main(int argc, char **argv) {
    fsw_set_callback(fsw_handle, callback, data);
 
    // Add event types
-   cevent_filter.flag= flag;
-   fsw_add_event_type_filter(fsw_handle, cevent_filter);
+   //cevent_filter.flag= flag;
+   //fsw_add_event_type_filter(fsw_handle, cevent_filter);
 
    // Add a watch to the directory
    if (fsw_add_path(fsw_handle, directory) < 0) {
