@@ -94,7 +94,7 @@ struct corrType corr;
    printf("File changed: %s\n", filename);
    fp = fopen(filename, "r");
 
-
+/*
    int i=0;
    char *ptr= NULL;
    char *prefix;
@@ -107,6 +107,7 @@ struct corrType corr;
    strncpy(prefix, ptr, len);
    prefix[len] = '\0';
    printf("type is %s\n", prefix);
+   */
 
    int32_t value;
    uint32_t value1;
@@ -165,7 +166,8 @@ struct corrType corr;
 
       char filename[255];
 
-      sprintf(filename, "spectra/%s_UNIT%d_DEV%d_NINT%d.txt", prefix, UNIT, DEV, NINT);
+      //sprintf(filename, "spectra/%s_UNIT%d_DEV%d_NINT%d.txt", prefix, UNIT, DEV, NINT);
+      sprintf(filename, "spectra/HOT_UNIT%d_DEV%d_NINT%d.txt",  UNIT, DEV, NINT);
       fout = fopen(filename, "w");
 
       //read human readable "Number of Lags"
@@ -302,8 +304,8 @@ int main(int argc, char **argv) {
    fsw_set_callback(fsw_handle, callback, data);
 
    // Add event types
-   //cevent_filter.flag= flag;
-   //fsw_add_event_type_filter(fsw_handle, cevent_filter);
+   cevent_filter.flag= flag;
+   fsw_add_event_type_filter(fsw_handle, cevent_filter);
 
    // Add a watch to the directory
    if (fsw_add_path(fsw_handle, directory) < 0) {
@@ -322,7 +324,7 @@ int main(int argc, char **argv) {
 #endif
 #ifdef USE_INOTIFY
    int fd = inotify_init();
-   int wd = inotify_add_watch(fd, directory, IN_CLOSE_WRITE);
+   int wd = inotify_add_watch(fd, directory, IN_MOVED_TO);
 
    while(1){
       int length = read(fd, buffer, EVENT_BUF_LEN);

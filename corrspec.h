@@ -4,7 +4,7 @@
 
    void const callback(const fsw_cevent *events, const unsigned int event_num, void * data);
 
-   int flag = 0;//1<<2;
+   int flag = 1<<2;
 
    struct fsw_event_type_filter cevent_filter;
 
