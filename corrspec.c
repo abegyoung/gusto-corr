@@ -58,7 +58,7 @@ struct corrType corr;
 
 void const callback(const fsw_cevent *events,const unsigned int event_num, void *data){
 
-   const char *filename = events->path;
+   char *filename = events->path;
 
 #endif
 
@@ -112,6 +112,35 @@ void const callback(struct inotify_event *event, const char *directory){
    strncpy(prefix, ptr, len);
    prefix[len] = '\0';
    printf("type is %s\n", prefix);
+
+
+
+
+   // Find scanID from filename
+   int scanID;
+   char *token;
+   int position = 0;
+
+    // Use strtok to tokenize the filename using underscores as delimiters
+    token = strtok(filename, "_");
+
+    // Iterate through the tokens until reaching the 2nd position
+    while (token != NULL && position < 2) {
+        token = strtok(NULL, "_");
+        position++;
+    }
+
+    // Check if the 2nd token exists and has 5 digits
+    if (position == 2 && token != NULL && strlen(token) == 5) {
+        scanID = atoi(token);  // Convert the token to an integer
+        printf("The scanID is: %d\n", scanID);
+    } else {
+        printf("No valid scanID found, setting to 00000\n");
+        scanID = 0;
+    }
+
+
+
 
    int32_t value;
    uint32_t value1;
@@ -170,7 +199,7 @@ void const callback(struct inotify_event *event, const char *directory){
       // Build the spectra filename and put it in the spectra directory
       char filename[255];
 
-      sprintf(filename, "spectra/%s_UNIT%d_DEV%d_NINT%d.txt", prefix, UNIT, DEV, NINT);
+      sprintf(filename, "spectra/%s_%05d_UNIT%d_DEV%d_NINT%03d.txt", prefix, scanID, UNIT, DEV, NINT);
       fout = fopen(filename, "w");
 
       //read human readable "Number of Lags"
