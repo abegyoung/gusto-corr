@@ -361,7 +361,7 @@ int main(int argc, char **argv) {
 
    char buffer[EVENT_BUF_LEN];
    int fd = inotify_init();
-   int wd = inotify_add_watch(fd, directory, IN_MOVED_TO);
+   int wd = inotify_add_watch(fd, directory, IN_MOVED_TO|IN_CLOSE_WRITE);
 
    while(1){
       int length = read(fd, buffer, EVENT_BUF_LEN);
