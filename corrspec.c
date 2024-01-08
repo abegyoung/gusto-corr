@@ -53,11 +53,22 @@ struct corrType corr;
 
 
 // Callback function to process the file
+// Function definition changes for FSWATCH or INOTIFY
 #ifdef USE_FSWATCH
-   void const callback(const fsw_cevent *events,const unsigned int event_num, void *data){
+
+void const callback(const fsw_cevent *events,const unsigned int event_num, void *data){
+
+   const char *filename = events->path;
+
 #endif
+
 #ifdef USE_INOTIFY
-   void const callback(struct inotify_event *event, const char *directory){
+
+void const callback(struct inotify_event *event, const char *directory){
+
+   char filename[128];
+   snprintf(filename, 128, "%s/%s", directory, event->name);
+
 #endif
 
    //timing
@@ -84,21 +95,15 @@ struct corrType corr;
    int32_t *Rn;
    int32_t *Rn2;
 
-#ifdef USE_FSWATCH
-   const char *filename = events->path;
-#endif
-#ifdef USE_INOTIFY
-   char filename[128];
-   snprintf(filename, 128, "%s/%s", directory, event->name);
-#endif
    printf("File changed: %s\n", filename);
    fp = fopen(filename, "r");
 
-/*
+   // Find file type from filename
+   // TODO: implement the UNKNOWN filetype
    int i=0;
-   char *ptr= NULL;
-   char *prefix;
-   const char *prefix_names[]={"SRC", "REF", "OTF", "HOT", "COLD", "FOC"};
+   char *ptr = NULL;
+   char *prefix=malloc(6*sizeof(char));;
+   const char *prefix_names[]={"SRC", "REF", "OTF", "HOT", "COLD", "FOC", "UNK"};
    while ( ptr==NULL ){
       ptr = strstr(filename, prefix_names[i]);
       i++;
@@ -107,7 +112,6 @@ struct corrType corr;
    strncpy(prefix, ptr, len);
    prefix[len] = '\0';
    printf("type is %s\n", prefix);
-   */
 
    int32_t value;
    uint32_t value1;
@@ -130,8 +134,7 @@ struct corrType corr;
 
 //////////////////////////////  LOOP OVER ALL SPECTRA IN FILE  ///////////////////////////////////
 
-//   for(int j=0; j<sz/bps; j++)
-   for(int j=0; j<1; j++)
+   for(int j=0; j<sz/bps; j++)
    {
       for(int i=0; i<22; i++){
          if(i==3){
@@ -164,10 +167,10 @@ struct corrType corr;
       fscanf(calf, "%*s %*s %f\n", &VIlo);
       fscanf(calf, "%*s %*s %f\n", &VQlo);
 
+      // Build the spectra filename and put it in the spectra directory
       char filename[255];
 
-      //sprintf(filename, "spectra/%s_UNIT%d_DEV%d_NINT%d.txt", prefix, UNIT, DEV, NINT);
-      sprintf(filename, "spectra/HOT_UNIT%d_DEV%d_NINT%d.txt",  UNIT, DEV, NINT);
+      sprintf(filename, "spectra/%s_UNIT%d_DEV%d_NINT%d.txt", prefix, UNIT, DEV, NINT);
       fout = fopen(filename, "w");
 
       //read human readable "Number of Lags"
@@ -271,9 +274,6 @@ struct corrType corr;
 int main(int argc, char **argv) {
    
    void *data;
-#ifdef USE_INOTIFY
-   char buffer[EVENT_BUF_LEN];
-#endif
 
    // Set the directory to monitor
    const char *directory = argv[1];
@@ -291,14 +291,16 @@ int main(int argc, char **argv) {
 
    printf("ready to start\n");
 
-   /* Initialize fswatch or inotify */
+   /* Initialize either fswatch or inotify */
+
 #ifdef USE_FSWATCH
+
    // Initialize the session
    fsw_init_library();
 
-   FSW_HANDLE fsw_handle = fsw_init_session(fsevents_monitor_type);  //MacOSX
+   FSW_HANDLE fsw_handle = fsw_init_session(fsevents_monitor_type);      //MacOSX
    //FSW_HANDLE fsw_handle = fsw_init_session(inotify_monitor_type);     //Linux
-   //FSW_HANDLE fsw_handle = fsw_init_session(kqueue_monitor_type);    //BSD
+   //FSW_HANDLE fsw_handle = fsw_init_session(kqueue_monitor_type);      //BSD
 
    // Set the callback function
    fsw_set_callback(fsw_handle, callback, data);
@@ -321,8 +323,14 @@ int main(int argc, char **argv) {
 
    // Clean up
    fsw_destroy_session(fsw_handle);
+
 #endif
+
+
+
 #ifdef USE_INOTIFY
+
+   char buffer[EVENT_BUF_LEN];
    int fd = inotify_init();
    int wd = inotify_add_watch(fd, directory, IN_MOVED_TO);
 
@@ -331,7 +339,9 @@ int main(int argc, char **argv) {
       struct inotify_event *event = (struct inotify_event *) &buffer;
       callback(event, directory);
    }
+
 #endif
+
 
    for(int i=0; i<4; i++){
      fftw_destroy_plan(spec[i].p);

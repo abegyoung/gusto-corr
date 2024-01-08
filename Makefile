@@ -17,7 +17,7 @@ else
 
 endif
 
-corrspec: corrspec.c
+corrspec: corrspec.c corrspec.h
 	$(CXX) -o corrspec corrspec.c $(INCLUDES) $(CXXFLAGS) $(LIBS)
 
 all: corrspec
