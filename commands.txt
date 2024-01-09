@@ -1,4 +1,3 @@
-#!python
 
 # remote shell to spectrometer
 ssh -oKexAlgorithms=diffie-hellman-group1-sha1 -oHostKeyAlgorithms=+ssh-dss root@192.168.1.201
@@ -9,8 +8,6 @@ sudo /opt/local/sbin/tftpd -L -c -s /private/tftpboot/
 
 fswatch -or ./out.spec |xargs -n1 -I{} ./plot.sh
 
-REPLACE NINT n with NINT n+1
-gsed -i -r 's/(NINT )([0-9]+)/echo "\1$((\2+1))"/ge' out.lags
 
 
                                 HEADER              MESSAGE

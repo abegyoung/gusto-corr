@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 import sys
 import time
 import ctypes
@@ -6,6 +6,7 @@ import socket
 import struct
 import argparse
 from datetime import datetime
+import subprocess
 
 def recv_len(the_socket, length):
   chunks = []
@@ -21,6 +22,7 @@ def recv_len(the_socket, length):
 parser = argparse.ArgumentParser()
 parser.add_argument("-d", "--dev", help="HIFAS #", default="1")
 parser.add_argument("-ip", "--serverip", help="correlator IP address", default="192.168.1.203")
+parser.add_argument("-r", "--read", help="read back spectra <0|1>", default="1")
 args = parser.parse_args()
 
 dev=int(args.dev)
@@ -31,18 +33,14 @@ serverip=args.serverip
 s=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect((serverip, 9734))
 
-#AUTO CAL              CMD LEN              DEV    NUM
-cmd=b'\x0b\x00\x00\x00\x87\x02\x00\x00\x00'+DEV+b'\x14\x00\x00\x00\x00'
+if (dev==0):
+  MASK=(15).to_bytes(1, byteorder='little')
+else:
+  MASK=(1<<(dev-1)).to_bytes(1, byteorder='little')
+#TRIGGER               CMD LEN              MASK
+cmd=b'\x0a\x00\x00\x00\x83\x01\x00\x00\x00'+MASK+b'\x00\x00\x00\x00'
 s.send(cmd)
 bytes_to_get=int.from_bytes(recv_len(s, 4), byteorder='little')
 data=recv_len(s, bytes_to_get)
-VIhi = struct.unpack("<f", data[11:15])
-VQhi = struct.unpack("<f", data[15:19])
-VIlo = struct.unpack("<f", data[19:23])
-VQlo = struct.unpack("<f", data[23:27])
-print('VIhi = {:.3f}'.format(VIhi[0]))
-print('VQhi = {:.3f}'.format(VQhi[0]))
-print('VIlo = {:.3f}'.format(VIlo[0]))
-print('VQlo = {:.3f}'.format(VQlo[0]))
 
 s.close()

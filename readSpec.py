@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 import sys
 import time
 import ctypes
@@ -8,9 +8,20 @@ import argparse
 from datetime import datetime
 import subprocess
 
+def recv_len(the_socket, length):
+  chunks = []
+  bytes_recd = 0
+  while bytes_recd < length:
+    chunk = the_socket.recv(min(length - bytes_recd, 2048))
+    if chunk == b'':
+      raise RuntimeError("socket broken")
+    chunks.append(chunk)
+    bytes_recd = bytes_recd + len(chunk)
+  return b''.join(chunks)
+
 parser = argparse.ArgumentParser()
 parser.add_argument("-d", "--dev", help="HIFAS #", default="1")
-parser.add_argument("-ip", "--serverip", help="correlator IP address", default="192.168.1.201")
+parser.add_argument("-ip", "--serverip", help="correlator IP address", default="192.168.1.203")
 args = parser.parse_args()
 
 dev=int(args.dev)
@@ -54,9 +65,9 @@ data=recv_len(s, bytes_to_get)
 #wait until fifo available
 fifo=0
 while (fifo==0):
-  #         LEN             CMD LEN            (==============)
-  s.send(b'\x09\x00\x00\x00\x05\x00\x00\x00\x00\x00\x00\x00\x00')
-  time.sleep(.05)
+  #      LEN             CMD LEN             (==============)
+  cmd=b'\x09\x00\x00\x00\x05\x00\x00\x00\x00\x00\x00\x00\x00'
+  s.send(cmd)
   bytes_to_get=int.from_bytes(recv_len(s, 4), byteorder='little')
   data=recv_len(s, bytes_to_get)
   print(data)
@@ -68,18 +79,19 @@ cmd=b'\x0a\x00\x00\x00\x06\x01\x00\x00\x00'+DEV+b'\x00\x00\x00\x00'
 print(cmd)
 s.send(cmd)
 bytes_to_get=int.from_bytes(recv_len(s, 4), byteorder='little') + 4
+print(bytes_to_get)
 #read another 5 bytes 0x06 cmd readback data
 data=recv_len(s, 5)
 #read 8300 bytes of header and lags (for 512 lags)
 data=recv_len(s, bytes_to_get-9)
 
 #save binary output
-#fp=open("lags.bin", "wb")
-#fp.write(data)
-#fp.close()
+fp=open("lags.bin", "wb")
+fp.write(data)
+fp.close()
 
 #save text output
-fp=open("out0.lags", "w")
+fp=open("out.lags", "w")
 print("FIFO",fifo,file=fp)
 
 #remaining 8300 bytes are header and lags
@@ -150,5 +162,3 @@ for i in range(0,NLAGS):
 
 s.close()
 fp.close()
-subprocess.run(
-        ['mv', 'out0.lags', 'out.lags'], stdout=subprocess.PIPE).stdout.decode('utf-8')
