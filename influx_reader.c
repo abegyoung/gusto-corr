@@ -7,7 +7,7 @@
 #define INFLUXDB_URL "http://localhost:8086/query?&db=gustoDBlp"
 
 // The specific query for InfluxDB 1.8
-#define INFLUXDB_QUERY "&q=SELECT * FROM \"B2Power\" ORDER BY time DESC LIMIT 1"
+#define INFLUXDB_QUERY "&q=SELECT * FROM \"ACS3_DEV1_VIlo\" WHERE \"scanID\"='00383' ORDER BY time DESC LIMIT 1"
 
 // Callback function to handle the response from the InfluxDB server
 size_t write_callback(void *contents, size_t size, size_t nmemb, void *userp) {
