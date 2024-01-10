@@ -1,5 +1,6 @@
 #include <inttypes.h>
 #include <sys/time.h>
+#include <time.h>
 #include <string.h>
 #include "callback.h"
 #include "corrspec.h"
@@ -248,7 +249,7 @@ void const callback(struct inotify_event *event, const char *directory){
 		    
       //ouput stats for last spectra in file
       printf("\nUNIXTIME is %" PRIu64 "\n", UNIXTIME);
-      printf("CORRTIME is %d\n", (5000.*1000000.)/(corr.corrtime*256.));
+      printf("CORRTIME is %d\n", (int)((5000.*1000000.)/(corr.corrtime*256.)));
       printDateTimeFromEpoch((long long) UNIXTIME);
       printf("UNIT is %d\n", UNIT);
       printf("DEV  is %d\n",   DEV); 

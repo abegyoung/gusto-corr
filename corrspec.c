@@ -15,11 +15,8 @@
 
 struct Spectrum spec[4];
 
-
 int main(int argc, char **argv) {
 
-     int flag = 1<<6;
-   struct fsw_event_type_filter cevent_filter;
    
    void *data;
 
@@ -42,6 +39,8 @@ int main(int argc, char **argv) {
    /* Initialize either fswatch or inotify */
 
 #ifdef USE_FSWATCH
+   int flag = 1<<6;
+   struct fsw_event_type_filter cevent_filter;
 
    // Initialize the session
    fsw_init_library();
