@@ -17,11 +17,13 @@ else
 
 endif
 
-corrspec: corrspec.c corrspec.h
-	$(CXX) -o corrspec corrspec.c $(INCLUDES) $(CXXFLAGS) $(LIBS)
+corrspec: corrspec.c corrspec.h callback.c callback.h
+	$(CXX) -c callback.c $(INCLUDES) $(CXXFLAGS) $(LIBS)
+	$(CXX) -c corrspec.c $(INCLUDES) $(CXXFLAGS) $(LIBS)
+	$(CXX) -o corrspec corrspec.o callback.o $(INCLUDES) $(CXXFLAGS) $(LIBS)
 
 all: corrspec
 
 clean:
-	rm corrspec
+	rm corrspec *.o
 
