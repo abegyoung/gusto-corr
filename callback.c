@@ -264,11 +264,7 @@ void const callback(struct inotify_event *event, const char *directory){
 		    
       //ouput stats for last spectra in file
       printf("\nUNIXTIME is %" PRIu64 "\n", UNIXTIME);
-<<<<<<< HEAD
       printf("CORRTIME is %.6f\n", (corr.corrtime*256.)/(5000.*1000000.));
-=======
-      printf("CORRTIME is %d\n", (int)((5000.*1000000.)/(corr.corrtime*256.)));
->>>>>>> 8b87b6c6f29ed6b7a5d33fb94272b0e2b1746685
       printDateTimeFromEpoch((long long) UNIXTIME);
       printf("UNIT is %d\n", UNIT);
       printf("DEV  is %d\n",   DEV); 
