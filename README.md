@@ -4,7 +4,7 @@ Omnisys correlator prototype software
 
 A series of Python 3 scripts is included to initialize, calibrate, and read data from a correlator.
 
-Optionally, C code for `corrspec` to watch for lag files delivered by NFS or TFTP and FFT's of the lags done for spectra output.  This relies on either inotify or fswatch.
+Optionally C code for `corrspec` to watch for lag files delivered by NFS or TFTP and FFT's of the lags done for spectra output.  This relies on either inotify or fswatch.
 
 ## Prerequisites:
 ### libiT Information Theory C library
