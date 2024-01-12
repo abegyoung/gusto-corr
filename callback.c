@@ -1,8 +1,10 @@
 #include <inttypes.h>
 #include <sys/time.h>
+#include <time.h>
 #include <string.h>
 #include "callback.h"
 #include "corrspec.h"
+#include <errno.h>
 
 #define PI 3.14159
 
@@ -69,7 +71,7 @@ void const callback(struct inotify_event *event, const char *directory){
    fp = fopen(filename, "r");
 
    // Find file type from filename
-   // TODO: implement the UNKNOWN filetype
+   // TODO: implement the UNKNOWN filetype and use tokens
    int i=0;
    char *ptr = NULL;
    char *prefix=malloc(6*sizeof(char));;
@@ -87,6 +89,7 @@ void const callback(struct inotify_event *event, const char *directory){
 
 
    // Find scanID from filename
+   // TODO: combine the file type and scanID from filename 
    int scanID;
    char *token;
    int position = 0;
@@ -95,19 +98,22 @@ void const callback(struct inotify_event *event, const char *directory){
     token = strtok(filename, "_");
 
     // Iterate through the tokens until reaching the 2nd position
-    while (token != NULL && position < 2) {
+    while (token != NULL ) {
         token = strtok(NULL, "_");
+
+        if (position == 2 ) {      //get scanID
+            scanID = atoi(token);
+            printf("The scanID is: %d\n", scanID);
+        }
+
         position++;
     }
 
     // Check if the 2nd token exists and has 5 digits
-    if (position == 2 && token != NULL && strlen(token) == 5) {
-        scanID = atoi(token);  // Convert the token to an integer
-        printf("The scanID is: %d\n", scanID);
-    } else {
-        printf("No valid scanID found, setting to 00000\n");
-        scanID = 0;
-    }
+    //} else {
+    //    printf("No valid scanID found, setting to 00000\n");
+    //    scanID = 0;
+    //}
 
 
 
@@ -123,17 +129,18 @@ void const callback(struct inotify_event *event, const char *directory){
    fseek(fp, 0L, SEEK_END);
    int sz = ftell(fp);          // get total bytes in file
    fseek(fp, 0L, SEEK_SET);     // go back to beginning of file
-   printf("File has %d spectra\n", sz/bps);
+   printf("File has %.1f spectra\n", (float)sz/bps);
 
    int32_t header[22];
    const char *header_names[]={"UNIT", "DEV", "NINT", "UNIXTIME", "CPU", "NBYTES", "CORRTIME", "EMPTY", \
                 "Ihigh", "Qhigh", "Ilow", "Qlow", "Ierr", "Qerr", \
                 "EMPTY", "EMPTY","EMPTY","EMPTY","EMPTY","EMPTY","EMPTY","EMPTY"};
 
-
 //////////////////////////////  LOOP OVER ALL SPECTRA IN FILE  ///////////////////////////////////
 
-   for(int j=0; j<sz/bps; j++)
+   int j;
+
+   for(j=0; j<(int)sz/bps; j++)
    {
       for(int i=0; i<22; i++){
          if(i==3){
@@ -153,9 +160,11 @@ void const callback(struct inotify_event *event, const char *directory){
       UNIT          = header[0];
       DEV           = header[1];
       NINT          = header[2];
+      //UNIXTIME      header[3]; 64 bits
       CPU           = header[4];
       NBYTES        = header[5];
       corr.corrtime = header[6];
+      //EMPTY         header[7];
       corr.Ihi      = header[8];
       corr.Qhi      = header[9];
       corr.Ilo      = header[10];
@@ -165,11 +174,12 @@ void const callback(struct inotify_event *event, const char *directory){
       fscanf(calf, "%*s %*s %f\n", &VQhi);
       fscanf(calf, "%*s %*s %f\n", &VIlo);
       fscanf(calf, "%*s %*s %f\n", &VQlo);
+      fclose(calf);
 
       // Build the spectra filename and put it in the spectra directory
-      char filename[255];
+      char filename[512] = "";
 
-      sprintf(filename, "spectra/%s_%05d_UNIT%d_DEV%d_NINT%03d.txt", prefix, scanID, UNIT, DEV, NINT);
+      sprintf(filename, "spectra/%s_%05d_UNIT%d_DEV%d_NINT%03d.txt", prefix, scanID, UNIT, DEV, j);
       fout = fopen(filename, "w");
 
       //read human readable "Number of Lags"
@@ -184,12 +194,12 @@ void const callback(struct inotify_event *event, const char *directory){
       int specA = (int) N/128 - 1;
 
       //First byte is Correlator STATUS
-      corr.QI  = malloc(N*sizeof(int32_t)+1);
-      corr.II  = malloc(N*sizeof(int32_t)+1);
-      corr.QQ  = malloc(N*sizeof(int32_t)+1);
-      corr.IQ  = malloc(N*sizeof(int32_t)+1);
-      Rn  = malloc(2*N*sizeof(int32_t)+1);
-      Rn2 = malloc(4*N*sizeof(int32_t)+1);
+      corr.QI  = malloc(N*sizeof(int32_t));
+      corr.II  = malloc(N*sizeof(int32_t));
+      corr.QQ  = malloc(N*sizeof(int32_t));
+      corr.IQ  = malloc(N*sizeof(int32_t));
+      Rn  = malloc(2*N*sizeof(int32_t));
+      Rn2 = malloc(4*N*sizeof(int32_t));
 
       // Read lags
       for(int i=0; i<N; i++){
@@ -204,11 +214,11 @@ void const callback(struct inotify_event *event, const char *directory){
       }
    
      // Combine IQ lags into R[]
-        for(int i=0; i<(2*N); i++){
+        for(int i=0; i<(2*N)-1; i++){
            if(i%2 == 0) Rn[i] = corr.II[i/2] + corr.QQ[i/2];
            if(i%2 == 1) Rn[i] = corr.IQ[(i-1)/2] + corr.QI[1+(i-1)/2];
         }
-        Rn[2*N] = corr.IQ[(N-1)/2] + corr.QI[(N-1)/2];
+        Rn[(2*N)-1] = corr.IQ[(N-1)/2] + corr.QI[(N-1)/2];
    
      // Mirror R[] symmetrically
         for(int i=0; i<4*N; i++){
@@ -217,7 +227,7 @@ void const callback(struct inotify_event *event, const char *directory){
         }
    
      // Fill fft struct
-        for(int i=0; i<4*N-1; i++){
+        for(int i=0; i<4*N; i++){
           spec[specA].in[i][0] = Rn2[i]*0.5*(1-cos(2*PI*i/((4*N)-2)));     //real with Hann window
           spec[specA].in[i][1] = 0.;                                       //imag
         }
@@ -230,7 +240,7 @@ void const callback(struct inotify_event *event, const char *directory){
         P_Q = pow((VQhi-VQlo),2) * 1.8197 / pow((erfinv(1-2*(double)corr.Qhi/(double)corr.corrtime)) + \
                                                 (erfinv(1-2*(double)corr.Qlo/(double)corr.corrtime)),2);
    
-      //Print in counts per second (assuming 4700
+      //Print in counts per second (assuming 5000 MHz sampling freq)
       for(int i=0; i<2*N; i++){
          fprintf(fout, "%d\t%lf\n", (5000*i)/(2*N), \
                                       (5000.*1000000.)/(corr.corrtime*256.)*sqrt(P_I*P_Q)* \
@@ -239,6 +249,12 @@ void const callback(struct inotify_event *event, const char *directory){
    
    
       fclose(fout); //close single spectra file
+      free(corr.QI);
+      free(corr.II);
+      free(corr.QQ);
+      free(corr.IQ);
+      free(Rn);
+      free(Rn2);
    }
 
 
@@ -248,7 +264,7 @@ void const callback(struct inotify_event *event, const char *directory){
 		    
       //ouput stats for last spectra in file
       printf("\nUNIXTIME is %" PRIu64 "\n", UNIXTIME);
-      printf("CORRTIME is %d\n", (5000.*1000000.)/(corr.corrtime*256.));
+      printf("CORRTIME is %.6f\n", (corr.corrtime*256.)/(5000.*1000000.));
       printDateTimeFromEpoch((long long) UNIXTIME);
       printf("UNIT is %d\n", UNIT);
       printf("DEV  is %d\n",   DEV); 
