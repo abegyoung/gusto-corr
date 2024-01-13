@@ -5,10 +5,11 @@
 #include "callback.h"
 #include "corrspec.h"
 #include <errno.h>
+#include <curl/curl.h>
+#include "influx.h"
 
 #define PI 3.14159
-
-
+#define BUFSIZE 128
 
 void printDateTimeFromEpoch(time_t ts){
 
@@ -40,8 +41,10 @@ void const callback(struct inotify_event *event, const char *directory){
 
 #endif
 
-   struct corrType corr;
+   CURL *curl;
+   CURLcode res;
 
+   struct corrType corr;
 
    //timing
    struct timeval begin, end;
@@ -109,13 +112,14 @@ void const callback(struct inotify_event *event, const char *directory){
         position++;
     }
 
-    // Check if the 2nd token exists and has 5 digits
-    //} else {
-    //    printf("No valid scanID found, setting to 00000\n");
-    //    scanID = 0;
-    //}
 
+   // Initialize the Influx DB
+   curl = init_influx();
+   char *query = malloc(BUFSIZ);
+   sprintf(query, "&q=SELECT * FROM \"%s\" WHERE \"scanID\"='%d' ORDER BY time DESC LIMIT 1", "ACS3_DEV1_VQhi", 9999);
 
+   double tmp = influxWorker(curl, query);
+   printf("I HOPE THIS WORKS! VALUE = %f\n", tmp);
 
 
    int32_t value;
@@ -282,6 +286,7 @@ void const callback(struct inotify_event *event, const char *directory){
       int microseconds = end.tv_usec - begin.tv_usec;
       double elapsed = seconds + microseconds*1e-6;
       printf("AVG FFTW %.1f ms in %d spectra\n\n", 1000.*elapsed/(sz/bps), sz/bps);
+      fflush(stdout);
    
 }
 

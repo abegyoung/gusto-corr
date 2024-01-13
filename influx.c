@@ -2,14 +2,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <curl/curl.h>
+#include "corrspec.h"
+#include "influx.h"
 
-#define BUFSIZE 128
-
-// InfluxDB parameters
-#define INFLUXDB_URL "http://localhost:8086/query?&db=gustoDBlp"
+double influx_return;
 
 // Callback function to handle the response from the InfluxDB server
-size_t write_callback(void *contents, size_t size, size_t nmemb, void *userp) {
+double write_callback(void *contents, size_t size, size_t nmemb, void *userp) {
 
     char *token;
     int position = 0;
@@ -42,21 +41,20 @@ size_t write_callback(void *contents, size_t size, size_t nmemb, void *userp) {
     printf("scanID = %d\n", scanID);
     printf("time = %s\n", time);
 
-    return realsize;
+    influx_return = value;
+
+    //return realsize;
+    return influx_return;
 }
 
-int main(int argc, char **argv) {
-    CURL *curl;
+// worker for the Influx DB query
+// Takes: curl handle
+// Operates: makes the function callback( )
+double influxWorker(CURL *curl, char *query)
+{
+
     CURLcode res;
-    char *query = malloc(BUFSIZ);
-    sprintf(query, "&q=SELECT * FROM \"%s\" WHERE \"scanID\"='%d' ORDER BY time DESC LIMIT 1", argv[1], atoi(argv[2]));
 
-    // Initialize libcurl
-    curl_global_init(CURL_GLOBAL_DEFAULT);
-
-    // Create a CURL handle
-    curl = curl_easy_init();
-    printf("size of handle %d\n", sizeof(curl));
     if (curl) {
         // Set the InfluxDB URL
         curl_easy_setopt(curl, CURLOPT_URL, INFLUXDB_URL);
@@ -70,17 +68,30 @@ int main(int argc, char **argv) {
         // Make the HTTP POST request
         res = curl_easy_perform(curl);
 
-        // Check for errors
-        if (res != CURLE_OK)
-            fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
 
-        // Cleanup
-        curl_easy_cleanup(curl);
+
     }
 
-    // Cleanup libcurl
-    curl_global_cleanup();
+   // Cleanup Influx DB
+   curl_easy_cleanup(curl);
+   curl_global_cleanup();
 
-    return 0;
+   return influx_return;
+
+}
+
+// Initialization function to connect to the Influx DB.
+// Returns: The curl handle to pass to the handler function
+CURL *init_influx()
+{
+    CURL *curl;
+
+    // Initialize libcurl
+    curl_global_init(CURL_GLOBAL_DEFAULT);
+
+    // Create a CURL handle
+    curl = curl_easy_init();
+
+    return curl;
 }
 
