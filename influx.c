@@ -37,9 +37,9 @@ double write_callback(void *contents, size_t size, size_t nmemb, void *userp) {
         position++;
     }
 
-    printf("value = %.3f\n", value);
-    printf("scanID = %d\n", scanID);
-    printf("time = %s\n", time);
+    //printf("value = %.3f\n", value);
+    //printf("scanID = %d\n", scanID);
+    //printf("time = %s\n", time);
 
     influx_return = value;
 

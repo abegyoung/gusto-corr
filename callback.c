@@ -41,20 +41,23 @@ void const callback(struct inotify_event *event, const char *directory){
 
 #endif
 
+   // InfluxDB easy_curl objects
    CURL *curl;
    CURLcode res;
-
-   struct corrType corr;
+   char *query = malloc(BUFSIZ);
+   char *query_list[] = {"_VIhi", "_VQhi", "_VIlo", "_VQlo"};
 
    //timing
    struct timeval begin, end;
    gettimeofday(&begin, 0);
 
+   //correlator file objectsI
    int N;
    FILE *fp;
    FILE *fout;
    double P_I;
    double P_Q;
+   struct corrType corr;
 
    uint64_t UNIXTIME;
    int NINT;
@@ -62,14 +65,16 @@ void const callback(struct inotify_event *event, const char *directory){
    int DEV;
    int NBYTES;
    int CPU;
-   float VQhi;
+   float dacV[4]; //0=VIhi, 1=VQhi, 2=VIlo, 3=VQlo
    float VIhi;
-   float VQlo;
+   float VQhi;
    float VIlo;
+   float VQlo;
 
    int32_t *Rn;
    int32_t *Rn2;
 
+   // notification
    printf("File changed: %s\n", filename);
    fp = fopen(filename, "r");
 
@@ -86,14 +91,12 @@ void const callback(struct inotify_event *event, const char *directory){
    int len = strlen(prefix_names[i-1]);
    strncpy(prefix, ptr, len);
    prefix[len] = '\0';
-   printf("type is %s\n", prefix);
-
-
-
+   printf("The type is %s\n", prefix);
 
    // Find scanID from filename
    // TODO: combine the file type and scanID from filename 
    int scanID;
+   int dataN;
    char *token;
    int position = 0;
 
@@ -109,18 +112,13 @@ void const callback(struct inotify_event *event, const char *directory){
             printf("The scanID is: %d\n", scanID);
         }
 
+        if (position == 3 ) {      //get scanID
+            dataN = atoi(token);
+            printf("The data file # is: %05d\n", dataN);
+        }
+
         position++;
     }
-
-
-   // Initialize the Influx DB
-   curl = init_influx();
-   char *query = malloc(BUFSIZ);
-   sprintf(query, "&q=SELECT * FROM \"%s\" WHERE \"scanID\"='%d' ORDER BY time DESC LIMIT 1", "ACS3_DEV1_VQhi", 9999);
-
-   double tmp = influxWorker(curl, query);
-   printf("I HOPE THIS WORKS! VALUE = %f\n", tmp);
-
 
    int32_t value;
    uint32_t value1;
@@ -173,17 +171,28 @@ void const callback(struct inotify_event *event, const char *directory){
       corr.Qhi      = header[9];
       corr.Ilo      = header[10];
       corr.Qlo      = header[11];
-      FILE *calf=fopen("cal.txt", "r");
-      fscanf(calf, "%*s %*s %f\n", &VIhi);
-      fscanf(calf, "%*s %*s %f\n", &VQhi);
-      fscanf(calf, "%*s %*s %f\n", &VIlo);
-      fscanf(calf, "%*s %*s %f\n", &VQlo);
-      fclose(calf);
+
+      // Initialize the Influx DB
+
+      for (int k=0; k<4; k++){
+         curl = init_influx();
+         sprintf(query, "&q=SELECT * FROM \"ACS%d_DEV%d%s\" WHERE \"scanID\"='%d' ORDER BY time DESC LIMIT 1", \
+                                  UNIT-1, DEV, query_list[k], scanID);
+
+         dacV[k] = influxWorker(curl, query);
+      }
+      //free(query);
+
+      VIhi = dacV[0];
+      VQhi = dacV[1];
+      VIlo = dacV[2];
+      VQlo = dacV[3];
+      printf("VIhi %.3f\tVQhi %.3f\tVIlo %.3f\tVQlo %.3f\n", VIhi, VQhi, VIlo, VQlo);
 
       // Build the spectra filename and put it in the spectra directory
       char filename[512] = "";
 
-      sprintf(filename, "spectra/%s_%05d_UNIT%d_DEV%d_NINT%03d.txt", prefix, scanID, UNIT, DEV, j);
+      sprintf(filename, "spectra/ACS%d_%s_%05d_DEV%d_NINT%03d.txt", UNIT-1, prefix, scanID, DEV, j);
       fout = fopen(filename, "w");
 
       //read human readable "Number of Lags"
@@ -217,24 +226,24 @@ void const callback(struct inotify_event *event, const char *directory){
          corr.QQ[i] = (value);
       }
    
-     // Combine IQ lags into R[]
-        for(int i=0; i<(2*N)-1; i++){
-           if(i%2 == 0) Rn[i] = corr.II[i/2] + corr.QQ[i/2];
-           if(i%2 == 1) Rn[i] = corr.IQ[(i-1)/2] + corr.QI[1+(i-1)/2];
-        }
-        Rn[(2*N)-1] = corr.IQ[(N-1)/2] + corr.QI[(N-1)/2];
+      // Combine IQ lags into R[]
+         for(int i=0; i<(2*N)-1; i++){
+            if(i%2 == 0) Rn[i] = corr.II[i/2] + corr.QQ[i/2];
+            if(i%2 == 1) Rn[i] = corr.IQ[(i-1)/2] + corr.QI[1+(i-1)/2];
+         }
+         Rn[(2*N)-1] = corr.IQ[(N-1)/2] + corr.QI[(N-1)/2];
    
-     // Mirror R[] symmetrically
-        for(int i=0; i<4*N; i++){
-          if(i<(2*N-1)) Rn2[i] = Rn[(2*N-1)-i];
-          else Rn2[i] = Rn[i-(2*N-1)];
-        }
+      // Mirror R[] symmetrically
+         for(int i=0; i<4*N; i++){
+           if(i<(2*N-1)) Rn2[i] = Rn[(2*N-1)-i];
+           else Rn2[i] = Rn[i-(2*N-1)];
+         }
    
-     // Fill fft struct
-        for(int i=0; i<4*N; i++){
-          spec[specA].in[i][0] = Rn2[i]*0.5*(1-cos(2*PI*i/((4*N)-2)));     //real with Hann window
-          spec[specA].in[i][1] = 0.;                                       //imag
-        }
+      // Fill fft struct
+         for(int i=0; i<4*N; i++){
+           spec[specA].in[i][0] = Rn2[i]*0.5*(1-cos(2*PI*i/((4*N)-2)));     //real with Hann window
+           spec[specA].in[i][1] = 0.;                                       //imag
+         }
    
      // Do FFT and print
         fftw_execute(spec[specA].p);
