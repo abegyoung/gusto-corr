@@ -11,6 +11,7 @@
 #define PI 3.14159
 #define BUFSIZE 128
 
+
 void printDateTimeFromEpoch(time_t ts){
 
         struct tm *tm = gmtime(&ts);
@@ -21,6 +22,21 @@ void printDateTimeFromEpoch(time_t ts){
 }
 
 
+int numPlaces (int n) {
+    if (n < 0) return numPlaces ((n == INT_MIN) ? INT_MAX: -n);
+    if (n < 10) return 1;
+    return 1 + numPlaces (n / 10);
+}
+
+
+char nthdigit(int x, int n)
+{
+    while (n--) {
+        x /= 10;
+    }
+    return (x % 10) + '0';
+}
+
 
 // Callback function to process the file
 // Function definition changes for FSWATCH or INOTIFY
@@ -28,7 +44,14 @@ void printDateTimeFromEpoch(time_t ts){
 
 void const callback(const fsw_cevent *events,const unsigned int event_num, void *data){
 
-   char *filename = events->path;
+   char *filein= events->path;
+
+   // for fswatch, get just the filename, not path
+   char *name;
+   char *last = strrchr(filein, '/');
+   if (last != NULL) {
+      sprintf(name, "%s", last+1);
+   }
 
 #endif
 
@@ -36,10 +59,12 @@ void const callback(const fsw_cevent *events,const unsigned int event_num, void 
 
 void const callback(struct inotify_event *event, const char *directory){
 
-   char filename[128];
-   snprintf(filename, 128, "%s/%s", directory, event->name);
+   char filein[128];
+   snprintf(filein, 128, "%s/%s", directory, event->name);
 
 #endif
+
+   char errfile[64] = "err.log";
 
    // InfluxDB easy_curl objects
    CURL *curl;
@@ -55,6 +80,7 @@ void const callback(struct inotify_event *event, const char *directory){
    int N;
    FILE *fp;
    FILE *fout;
+   FILE *errf;
    double P_I;
    double P_Q;
    struct corrType corr;
@@ -75,8 +101,8 @@ void const callback(struct inotify_event *event, const char *directory){
    int32_t *Rn2;
 
    // notification
-   printf("File changed: %s\n", filename);
-   fp = fopen(filename, "r");
+   printf("File changed: %s\n", filein);
+   fp = fopen(filein, "r");
 
    // Find file type from filename
    // TODO: implement the UNKNOWN filetype and use tokens
@@ -85,7 +111,7 @@ void const callback(struct inotify_event *event, const char *directory){
    char *prefix=malloc(6*sizeof(char));;
    const char *prefix_names[]={"SRC", "REF", "OTF", "HOT", "COLD", "FOC", "UNK"};
    while ( ptr==NULL ){
-      ptr = strstr(filename, prefix_names[i]);
+      ptr = strstr(filein, prefix_names[i]);
       i++;
    }
    int len = strlen(prefix_names[i-1]);
@@ -101,24 +127,50 @@ void const callback(struct inotify_event *event, const char *directory){
    int position = 0;
 
     // Use strtok to tokenize the filename using underscores as delimiters
-    token = strtok(filename, "_");
+    token = strtok(filein, "_");
 
     // Iterate through the tokens until reaching the 2nd position
     while (token != NULL ) {
         token = strtok(NULL, "_");
 
-        if (position == 2 ) {      //get scanID
+        if (position == 1 ) {      //get scanID
             scanID = atoi(token);
             printf("The scanID is: %d\n", scanID);
         }
 
-        if (position == 3 ) {      //get scanID
+        if (position == 2 ) {      //get scanID
             dataN = atoi(token);
-            printf("The data file # is: %05d\n", dataN);
+            printf("The data file index # is: %05d\n", dataN);
         }
 
         position++;
     }
+
+
+   // Build a regex with the range of the previous 8 scanID #s
+   char scanIDregex[60];
+   int pos = 0;
+   /*
+   for (int k=numPlaces(scanID)-1; k>=0 ; k--) {
+     // for the final two digits
+      if(k==0 && nthdigit(scanID, 0)<7)
+         pos += sprintf(&scanIDregex[pos], "[%c-90-%c]", nthdigit(scanID, k)-8, nthdigit(scanID, k));
+      else if(k==0 && nthdigit(scanID, 0)>=7)
+         pos += sprintf(&scanIDregex[pos], "[0-%c0-%c]", nthdigit(scanID, k), nthdigit(scanID, k));
+      else if(k==1)
+         pos += sprintf(&scanIDregex[pos], "[%c%c]", nthdigit(scanID, k)-1, nthdigit(scanID, k));
+
+      // For the rest of the digits
+      else
+         pos += sprintf(&scanIDregex[pos], "[%c]", nthdigit(scanID, k));
+   }
+   */
+   pos += sprintf(&scanIDregex[pos], "(");
+   for (int k=0; k<7; k++){
+      pos += sprintf(&scanIDregex[pos], "%d|", scanID-k);
+   }
+   pos += sprintf(&scanIDregex[pos], "%d)", scanID-7);
+   printf("%s\n", scanIDregex);
 
    int32_t value;
    uint32_t value1;
@@ -171,29 +223,45 @@ void const callback(struct inotify_event *event, const char *directory){
       corr.Qhi      = header[9];
       corr.Ilo      = header[10];
       corr.Qlo      = header[11];
+      corr.Ierr     = header[12];
+      corr.Qerr     = header[13];
 
       // Initialize the Influx DB
-
+      // read 4 correlator DAC voltages
       for (int k=0; k<4; k++){
          curl = init_influx();
-         sprintf(query, "&q=SELECT * FROM \"ACS%d_DEV%d%s\" WHERE \"scanID\"='%d' ORDER BY time DESC LIMIT 1", \
-                                  UNIT-1, DEV, query_list[k], scanID);
+         sprintf(query, "&q=SELECT * FROM \"ACS%d_DEV%d%s\" WHERE \"scanID\"=~/%s/  \
+                                                             ORDER BY time DESC LIMIT 1", \
+                                          UNIT-1, DEV, query_list[k], scanIDregex);
 
-         dacV[k] = influxWorker(curl, query);
+         //dacV[k] = influxWorker(curl, query);
+         influxReturn = influxWorker(curl, query);
+         dacV[k] = influxReturn.value;
       }
-      //free(query);
-
+      // don't trust myself to rewrite the below, just copy from vector into floats
       VIhi = dacV[0];
       VQhi = dacV[1];
       VIlo = dacV[2];
       VQlo = dacV[3];
-      printf("VIhi %.3f\tVQhi %.3f\tVIlo %.3f\tVQlo %.3f\n", VIhi, VQhi, VIlo, VQlo);
+
+      // this section here unfuck-ifys special cases where ICE was off by one
+      if (VQlo==0.){
+        VIhi=VIhi-(VIlo-VQhi);  //make up this lost data, it'l be close enough
+        VQhi = dacV[0];
+        VIlo = dacV[1];
+        VQlo = dacV[2];
+      }
+      
+      // DEBUG
+      //printf("VIhi %.3f\tVQhi %.3f\tVIlo %.3f\tVQlo %.3f\n", VIhi, VQhi, VIlo, VQlo);
+
 
       // Build the spectra filename and put it in the spectra directory
-      char filename[512] = "";
+      char fileout[512] = "";
 
-      sprintf(filename, "spectra/ACS%d_%s_%05d_DEV%d_NINT%03d.txt", UNIT-1, prefix, scanID, DEV, j);
-      fout = fopen(filename, "w");
+      sprintf(fileout, "spectra/ACS%d_%s_%05d_DEV%d_INDX%04d_NINT%03d.txt", \
+                                               UNIT-1, prefix, scanID, DEV, dataN, j);
+      fout = fopen(fileout, "w");
 
       //read human readable "Number of Lags"
       if (NBYTES==8256)
@@ -206,24 +274,24 @@ void const callback(struct inotify_event *event, const char *directory){
         N = 128;
       int specA = (int) N/128 - 1;
 
-      //First byte is Correlator STATUS
-      corr.QI  = malloc(N*sizeof(int32_t));
-      corr.II  = malloc(N*sizeof(int32_t));
-      corr.QQ  = malloc(N*sizeof(int32_t));
-      corr.IQ  = malloc(N*sizeof(int32_t));
+      //We don't know the lag # until we open the file, so malloc now
+      corr.QI   = malloc(N*sizeof(int32_t));
+      corr.II   = malloc(N*sizeof(int32_t));
+      corr.QQ   = malloc(N*sizeof(int32_t));
+      corr.IQ   = malloc(N*sizeof(int32_t));
       Rn  = malloc(2*N*sizeof(int32_t));
       Rn2 = malloc(4*N*sizeof(int32_t));
 
       // Read lags
       for(int i=0; i<N; i++){
          fread(&value, 4, 1, fp);
-         corr.II[i] = (value);
+         corr.II[i] = value;
          fread(&value, 4, 1, fp);
-         corr.IQ[i] = (value);
+         corr.IQ[i] = value;
          fread(&value, 4, 1, fp);
-         corr.QI[i] = (value);
+         corr.QI[i] = value;
          fread(&value, 4, 1, fp);
-         corr.QQ[i] = (value);
+         corr.QQ[i] = value;
       }
    
       // Combine IQ lags into R[]
@@ -252,6 +320,61 @@ void const callback(struct inotify_event *event, const char *directory){
                                                 (erfinv(1-2*(double)corr.Ilo/(double)corr.corrtime)),2);
         P_Q = pow((VQhi-VQlo),2) * 1.8197 / pow((erfinv(1-2*(double)corr.Qhi/(double)corr.corrtime)) + \
                                                 (erfinv(1-2*(double)corr.Qlo/(double)corr.corrtime)),2);
+
+    // Header information in spectra file
+      //fprintf(fout, "DATAFILE\t%s\n", filein_name);
+      fprintf(fout, "UNIXTIME\t%" PRIu64 "\n", UNIXTIME);
+      fprintf(fout, "CORRTIME\t%.6f\n", (corr.corrtime*256.)/(5000.*1000000.));
+      fprintf(fout, "UNIT\t%d\n", UNIT);
+      fprintf(fout, "DEV\t%d\n",   DEV); 
+      fprintf(fout, "NLAGS\t%d\n", N);
+      fprintf(fout, "NINT\t%d\n", NINT);
+      fprintf(fout, "LEVEL_Ihi\t%.2f\n",  (double)corr.Ihi/(double)corr.corrtime);
+      fprintf(fout, "LEVEL_Qhi\t%.2f\n",  (double)corr.Qhi/(double)corr.corrtime);
+      fprintf(fout, "LEVEL_Ilo\t%.2f\n",  (double)corr.Ilo/(double)corr.corrtime);
+      fprintf(fout, "LEVEL_Qlo\t%.2f\n",  (double)corr.Qlo/(double)corr.corrtime);
+      fprintf(fout, "IHI\t%u\n",  corr.Ihi);
+      fprintf(fout, "QHI\t%u\n",  corr.Qhi);
+      fprintf(fout, "ILO\t%u\n",  corr.Ilo);
+      fprintf(fout, "ILO\t%u\n",  corr.Qlo);
+
+    // Used calibration DAC voltages
+      fprintf(fout, "VIHI\t%.3f\nVQHI\t%.3f\nVILO\t%.3f\nVQLO\t%.3f\n", VIhi, VQhi, VIlo, VQlo);
+      fprintf(fout, "CAL\t%d\n", influxReturn.scanID);
+      fprintf(fout, "DATA\t%d\n", scanID);
+
+    // Data consistency checks and error flaging
+      fprintf(fout, "IERR\t%u\n", corr.Ierr);
+      fprintf(fout, "QERR\t%u\n", corr.Qerr);
+      fprintf(fout, "ZEROLAGSUM_I\t%u\t%u\n", corr.Ihi+corr.Ilo, corr.II[0]);
+      fprintf(fout, "ZEROLAGSUM_Q\t%u\t%u\n", corr.Qhi+corr.Qlo, corr.QQ[0]);
+
+      if (corr.Ierr!=0 || corr.Qerr!=0 )
+      {
+         printf("######################## ERROR ###########################\n");
+         printf("#                                                        #\n");
+         printf("#                Error, data is no good!                 #\n");
+         printf("#                                                        #\n");
+         printf("######################## ERROR ###########################\n");
+      }
+      if(true)
+      {
+         errf = fopen(errfile, "a");
+         fprintf(errf, "%s\t", name);
+         fflush(errf);
+         fprintf(errf, "%" PRIu64 "\t", UNIXTIME);
+         fprintf(errf, "%u\t", CPU);
+         fprintf(errf, "%s\t", prefix);
+         fprintf(errf, "%d\t%d\t", UNIT, DEV);
+         fprintf(errf, "%.6f\t", (corr.corrtime*256.)/(5000.*1000000.));
+         fprintf(errf, "%u\t", corr.Ierr);
+         fprintf(errf, "%u\t", corr.Qerr);
+         fprintf(errf, "%u\t", abs((corr.Ihi+corr.Ilo)-corr.II[0]));
+         fprintf(errf, "%u\n", abs((corr.Qhi+corr.Qlo)-corr.QQ[0]));
+         fclose(errf);
+      }
+
+      fprintf(fout, "ETAQ\t%.3f\n", 1/sqrt(P_I*P_Q));
    
       //Print in counts per second (assuming 5000 MHz sampling freq)
       for(int i=0; i<2*N; i++){
@@ -260,14 +383,15 @@ void const callback(struct inotify_event *event, const char *directory){
                                       sqrt(fabs(spec[specA].out[i][0]*(-1*spec[specA].out[i][1]))) );
       }
    
-   
       fclose(fout); //close single spectra file
-      free(corr.QI);
+
+      free(corr.QI);    //free all mallocs
       free(corr.II);
       free(corr.QQ);
       free(corr.IQ);
       free(Rn);
       free(Rn2);
+
    }
 
 
@@ -282,12 +406,23 @@ void const callback(struct inotify_event *event, const char *directory){
       printf("UNIT is %d\n", UNIT);
       printf("DEV  is %d\n",   DEV); 
       printf("NINT is %d\n", NINT);
-      printf("%.2f %.2f %.2f %.2f\n",  (double)corr.Qhi/(double)corr.corrtime, \
-                                       (double)corr.Ihi/(double)corr.corrtime, \
-                                       (double)corr.Qlo/(double)corr.corrtime, \
-                                       (double)corr.Ilo/(double)corr.corrtime);
+      printf("%.2f %.2f %.2f %.2f\n",  (double)corr.Ihi/(double)corr.corrtime, \
+                                       (double)corr.Qhi/(double)corr.corrtime, \
+                                       (double)corr.Ilo/(double)corr.corrtime, \
+                                       (double)corr.Qlo/(double)corr.corrtime);
       printf("nlags=%d\n", N);
-      printf("etaQ %.3f\n", 1/sqrt(P_I*P_Q));
+      printf("etaQ %.3f\n\n", 1/sqrt(P_I*P_Q));
+
+      // current scanID, and scanID used for cal
+      printf("The cal  is from scanID: %d\n", influxReturn.scanID);
+      printf("The data is from scanID: %d\n", scanID);
+      if(influxReturn.scanID==0 || influxReturn.scanID > scanID){
+        printf("######################## ERROR ###########################\n");
+        printf("#                                                        #\n");
+        printf("#           Error, calibration was no good!              #\n");
+        printf("#                                                        #\n");
+        printf("######################## ERROR ###########################\n");
+      }
 
       //timing
       gettimeofday(&end, 0);

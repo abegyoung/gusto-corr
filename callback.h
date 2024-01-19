@@ -13,6 +13,8 @@ struct corrType
    uint32_t Ihi;           //32 bit Ihi monitor
    uint32_t Qlo;           //32 bit Qlo monitor
    uint32_t Ilo;           //32 bit Ilo monitor
+   uint32_t Ierr;          //32 bit Ierr monitor
+   uint32_t Qerr;          //32 bit Qerr monitor
    int32_t *QI;            //32 bit QI lag values
    int32_t *II;            //32 bit II lag values
    int32_t *QQ;            //32 bit QR lag values

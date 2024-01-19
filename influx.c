@@ -5,10 +5,12 @@
 #include "corrspec.h"
 #include "influx.h"
 
-double influx_return;
+//the returned data
+//double influx_return;
+struct influxStruct influxReturn;
 
 // Callback function to handle the response from the InfluxDB server
-double write_callback(void *contents, size_t size, size_t nmemb, void *userp) {
+struct influxStruct write_callback(void *contents, size_t size, size_t nmemb, void *userp) {
 
     char *token;
     int position = 0;
@@ -17,6 +19,7 @@ double write_callback(void *contents, size_t size, size_t nmemb, void *userp) {
     int scanID;
     float value;
     size_t realsize = size * nmemb;
+
 
     token = strtok(contents, ",");
 
@@ -41,16 +44,19 @@ double write_callback(void *contents, size_t size, size_t nmemb, void *userp) {
     //printf("scanID = %d\n", scanID);
     //printf("time = %s\n", time);
 
-    influx_return = value;
+    influxReturn.value  = value;
+    influxReturn.scanID = scanID;
 
     //return realsize;
-    return influx_return;
+    //return influx_return;
+    return influxReturn;
+
 }
 
 // worker for the Influx DB query
 // Takes: curl handle
 // Operates: makes the function callback( )
-double influxWorker(CURL *curl, char *query)
+struct influxStruct influxWorker(CURL *curl, char *query)
 {
 
     CURLcode res;
@@ -76,7 +82,8 @@ double influxWorker(CURL *curl, char *query)
    curl_easy_cleanup(curl);
    curl_global_cleanup();
 
-   return influx_return;
+   //return influx_return;   //return the value
+   return influxReturn;      //return the struct
 
 }
 
