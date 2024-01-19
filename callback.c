@@ -245,7 +245,7 @@ void const callback(struct inotify_event *event, const char *directory){
       VQlo = dacV[3];
 
       // DEBUG
-      printf("VIhi %.3f\tVQhi %.3f\tVIlo %.3f\tVQlo %.3f\n", VIhi, VQhi, VIlo, VQlo);
+      //printf("VIhi %.3f\tVQhi %.3f\tVIlo %.3f\tVQlo %.3f\n", VIhi, VQhi, VIlo, VQlo);
 
       // this section here unfuck-ifys special cases where ICE was off by one
       if (VQlo==0.){
@@ -257,7 +257,7 @@ void const callback(struct inotify_event *event, const char *directory){
 
       
       // DEBUG
-      printf("VIhi %.3f\tVQhi %.3f\tVIlo %.3f\tVQlo %.3f\n", VIhi, VQhi, VIlo, VQlo);
+      //printf("VIhi %.3f\tVQhi %.3f\tVIlo %.3f\tVQlo %.3f\n", VIhi, VQhi, VIlo, VQlo);
 
 
       if(VIhi==0.){ //Still no values?  break and don't make spectra
