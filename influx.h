@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <curl/curl.h>
+#include <stdint.h>
 
 
 // global variable to be returned by worker from callback fn

@@ -62,6 +62,8 @@ void const callback(struct inotify_event *event, const char *directory){
    char filein[128];
    snprintf(filein, 128, "%s/%s", directory, event->name);
 
+   char *name = event->name;
+
 #endif
 
    char errfile[64] = "err.log";
@@ -150,27 +152,14 @@ void const callback(struct inotify_event *event, const char *directory){
    // Build a regex with the range of the previous 8 scanID #s
    char scanIDregex[60];
    int pos = 0;
-   /*
-   for (int k=numPlaces(scanID)-1; k>=0 ; k--) {
-     // for the final two digits
-      if(k==0 && nthdigit(scanID, 0)<7)
-         pos += sprintf(&scanIDregex[pos], "[%c-90-%c]", nthdigit(scanID, k)-8, nthdigit(scanID, k));
-      else if(k==0 && nthdigit(scanID, 0)>=7)
-         pos += sprintf(&scanIDregex[pos], "[0-%c0-%c]", nthdigit(scanID, k), nthdigit(scanID, k));
-      else if(k==1)
-         pos += sprintf(&scanIDregex[pos], "[%c%c]", nthdigit(scanID, k)-1, nthdigit(scanID, k));
-
-      // For the rest of the digits
-      else
-         pos += sprintf(&scanIDregex[pos], "[%c]", nthdigit(scanID, k));
-   }
-   */
    pos += sprintf(&scanIDregex[pos], "(");
    for (int k=0; k<7; k++){
       pos += sprintf(&scanIDregex[pos], "%d|", scanID-k);
    }
    pos += sprintf(&scanIDregex[pos], "%d)", scanID-7);
    printf("%s\n", scanIDregex);
+
+
 
    int32_t value;
    uint32_t value1;
@@ -226,6 +215,17 @@ void const callback(struct inotify_event *event, const char *directory){
       corr.Ierr     = header[12];
       corr.Qerr     = header[13];
 
+      if (corr.Ierr!=0 || corr.Qerr!=0 )
+      {
+         printf("######################## ERROR ###########################\n");
+         printf("#                                                        #\n");
+         printf("#                Error, data is no good!                 #\n");
+         printf("#                        Exiting!                        #\n");
+         printf("#                                                        #\n");
+         printf("######################## ERROR ###########################\n");
+         break;
+      }
+
       // Initialize the Influx DB
       // read 4 correlator DAC voltages
       for (int k=0; k<4; k++){
@@ -244,6 +244,9 @@ void const callback(struct inotify_event *event, const char *directory){
       VIlo = dacV[2];
       VQlo = dacV[3];
 
+      // DEBUG
+      printf("VIhi %.3f\tVQhi %.3f\tVIlo %.3f\tVQlo %.3f\n", VIhi, VQhi, VIlo, VQlo);
+
       // this section here unfuck-ifys special cases where ICE was off by one
       if (VQlo==0.){
         VIhi=VIhi-(VIlo-VQhi);  //make up this lost data, it'l be close enough
@@ -251,9 +254,16 @@ void const callback(struct inotify_event *event, const char *directory){
         VIlo = dacV[1];
         VQlo = dacV[2];
       }
+
       
       // DEBUG
-      //printf("VIhi %.3f\tVQhi %.3f\tVIlo %.3f\tVQlo %.3f\n", VIhi, VQhi, VIlo, VQlo);
+      printf("VIhi %.3f\tVQhi %.3f\tVIlo %.3f\tVQlo %.3f\n", VIhi, VQhi, VIlo, VQlo);
+
+
+      if(VIhi==0.){ //Still no values?  break and don't make spectra
+        printf("no DAC values, bailing.\n");
+        break;
+      }
 
 
       // Build the spectra filename and put it in the spectra directory
@@ -349,15 +359,7 @@ void const callback(struct inotify_event *event, const char *directory){
       fprintf(fout, "ZEROLAGSUM_I\t%u\t%u\n", corr.Ihi+corr.Ilo, corr.II[0]);
       fprintf(fout, "ZEROLAGSUM_Q\t%u\t%u\n", corr.Qhi+corr.Qlo, corr.QQ[0]);
 
-      if (corr.Ierr!=0 || corr.Qerr!=0 )
-      {
-         printf("######################## ERROR ###########################\n");
-         printf("#                                                        #\n");
-         printf("#                Error, data is no good!                 #\n");
-         printf("#                                                        #\n");
-         printf("######################## ERROR ###########################\n");
-      }
-      if(true)
+      if(1)
       {
          errf = fopen(errfile, "a");
          fprintf(errf, "%s\t", name);
