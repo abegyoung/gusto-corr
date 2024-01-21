@@ -1,13 +1,36 @@
+import sys
+import csv
+from datetime import datetime
+from influxdb import InfluxDBClient
 
-from influxdb_client import InfluxDBClient, Point
+# Example usage:
+f = open(str(sys.argv[1]), 'r')
+c = csv.reader(f)
+for row in c: 
+  if(row[0] == "name"):
+    # row is column names
+    pass
+  else:
+    if ("ACS" in row[0]):
+      #      name    time    scanID   volt
+      name = row[0]
+      time_cap = datetime.fromtimestamp(int(row[1])/1000000000).strftime("%Y-%m-%dT%H:%M:%SZ")
+      scanID = int(row[7])
+      volt = float(row[11])
 
+      json_body = [
+      {
+             "measurement": "{}".format(name),
+             "tags": {
+                 "scanID": "{}".format(scanID)
+             },
+             "time": "{}".format(time_cap),
+             "fields": {
+                 "volt": float(volt)
+             }
+         }
+      ]
 
-    # Python influxdb_client with library backward v1.8
-    username = ''
-    password = ''
-    database = 'gustoDBlp'
-    retention_policy = 'autogen'
-    bucket = f'{database}/{retention_policy}'
-
-    client = InfluxDBClient(url='http://192.168.1.11:8086', token=f'{username}:{password}', org='-')
-
+      print(json_body)
+      client = InfluxDBClient('localhost', 8086, '', '', 'gustoDBlp')
+      client.write_points(json_body)
