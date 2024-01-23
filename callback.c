@@ -156,7 +156,8 @@ void const callback(struct inotify_event *event, const char *directory){
    for (int k=0; k<7; k++){
       pos += sprintf(&scanIDregex[pos], "%d|", scanID-k);
    }
-   pos += sprintf(&scanIDregex[pos], "%d)", scanID-7);
+   pos += sprintf(&scanIDregex[pos], "%d|", scanID-7);
+   pos += sprintf(&scanIDregex[pos], "%d)", 6777);
    printf("%s\n", scanIDregex);
 
 
@@ -418,7 +419,7 @@ void const callback(struct inotify_event *event, const char *directory){
       // current scanID, and scanID used for cal
       printf("The cal  is from scanID: %d\n", influxReturn.scanID);
       printf("The data is from scanID: %d\n", scanID);
-      if(influxReturn.scanID==0 || influxReturn.scanID > scanID){
+      if(influxReturn.scanID==0 ){
         printf("######################## ERROR ###########################\n");
         printf("#                                                        #\n");
         printf("#           Error, calibration was no good!              #\n");

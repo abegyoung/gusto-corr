@@ -15,8 +15,8 @@ for row in c:
       #      name    time    scanID   volt
       name = row[0]
       time_cap = datetime.fromtimestamp(int(row[1])/1000000000).strftime("%Y-%m-%dT%H:%M:%SZ")
-      scanID = int(row[6])
-      volt = float(row[10])
+      scanID = int(row[7])
+      volt = float(row[11])
 
       json_body = [
          {
