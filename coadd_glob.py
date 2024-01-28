@@ -2,6 +2,9 @@ import sys
 import numpy as np
 import glob
 import matplotlib.pyplot as plt
+from PyAstronomy import pyasl
+
+doDespike = True
 
 def read_and_average_files(file_pattern, n_lines_header=0):
     # Get a list of files that match the specified pattern
@@ -55,8 +58,8 @@ def plot_subtraction_ratio(x_values, subtraction_ratio, x_limit, y_limit):
     plt.figure()
     # Plot the subtraction ratio with the first column on the x-axis
     plt.step(x_values, subtraction_ratio)
-    plt.xlabel('X-Axis Label')
-    plt.ylabel('Y-Axis Label')
+    plt.xlabel('MHz')
+    plt.ylabel('(S-R) / R (+ DC offset)')
     a = plt.gca()
  
     # set visibility of x-axis as False
@@ -74,9 +77,10 @@ def plot_subtraction_ratio(x_values, subtraction_ratio, x_limit, y_limit):
     plt.tight_layout()
     plt.text(0.6, 0.8, "{:02d}".format(numlab), transform=a.transAxes)
     #plt.savefig( 'NGC3603-{:02d}.png'.format(num), dpi=my_dpi)
-    plt.savefig( 'NGC3603-{:02d}.png'.format(num))
+    #plt.savefig( 'NGC3603-{:02d}.png'.format(num))
 
-    #plt.show()
+    plt.arrow(900, .02, 0, -.005)
+    plt.show()
 
 if __name__ == "__main__":
     # Check if the correct number of command-line arguments is provided
@@ -104,11 +108,24 @@ if __name__ == "__main__":
         subtraction_ratio = (average_second_column1 - average_second_column2) / average_second_column2
 
         # Set limits on the x and y axes
-        subtraction_ratio[201:204] = subtraction_ratio[200]
-        subtraction_ratio[131:137] = subtraction_ratio[130]
+        #subtraction_ratio[201:204] = subtraction_ratio[200]
+        #subtraction_ratio[131:137] = subtraction_ratio[130]
         x_limit = (500, 3500)  # Replace xmin and xmax with your desired values
-        y_limit = (subtraction_ratio[250]-.005, subtraction_ratio[250]+.025)
+        y_limit = (-0.005, 0.025)
+        spec = subtraction_ratio-subtraction_ratio[250]
+
+        # despike
+        newspec = []
+        if doDespike == True:
+          mask = np.zeros(len(spec), dtype=bool)
+          r = pyasl.pointDistGESD(spec, maxOLs=20, alpha=5)
+          
+          mask[r[1]] = 1
+          newspec = np.ma.masked_array(spec, mask)
+
+        else:
+          newspec = spec
 
         # Plot the result with customized axis labels and limits
-        plot_subtraction_ratio(x_values, subtraction_ratio, x_limit, y_limit)
+        plot_subtraction_ratio(x_values, newspec, x_limit, y_limit)
 
