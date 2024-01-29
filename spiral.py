@@ -7,6 +7,37 @@ import math as m
 
 doDespike = True
 
+def create_spiral_index(size):
+    # Initialize variables for the center and current index
+    center = size // 2
+    current_index = 0
+
+    # Initialize a list to store the (i, j) position indices
+    spiral_index = []
+
+    # Nested for loop to traverse the map in a spiral pattern
+    for i in range(size // 2 + 1):
+        for j in range(center - i, center + i + 1):
+            spiral_index.append((i, j))
+            current_index += 1
+
+        for j in range(center - i + 1, center + i + 1):
+            spiral_index.append((j, size - 1 - i))
+            current_index += 1
+
+        for j in range(center + i - 1, center - i - 1, -1):
+            spiral_index.append((size - 1 - i, j))
+            current_index += 1
+
+        for j in range(center + i - 1, center - i, -1):
+            spiral_index.append((j, i))
+            current_index += 1
+
+    return spiral_index
+
+# Display the 1D index containing tuples with (i, j) position indices
+spiral_index = create_spiral_index(5)
+
 def read_and_average_files(file_pattern, n_lines_header=0):
     # Get a list of files that match the specified pattern
     files = glob.glob(file_pattern)
@@ -45,18 +76,19 @@ def read_and_average_files(file_pattern, n_lines_header=0):
     average_first_column = np.mean(all_first_columns, axis=0)
     average_second_column = np.nanmean(valid_second_columns, axis=0)
 
-    return average_second_column
+    return average_first_column, average_second_column
 
 
 
-def plot_subtraction_ratio(x_values, y_values, xpoint, ypoint):
+def plot_subtraction_ratio(x_values, y_values, xpoint, ypoint, indx):
     global axes
 
     # Plot the subtraction ratio with the first column on the x-axis
     axes[xpoint, ypoint].step(x_values, y_values)
+    a = plt.gca()
 
-    axes[xpoint, ypoint].set_xlim(150, 350)
-    axes[xpoint, ypoint].set_ylim(-.01, .01)
+    axes[xpoint, ypoint].set_xlim(600, 1500)
+    axes[xpoint, ypoint].set_ylim(-.005, .005)
 
     # set visibility of x-axis as False
     xax = axes[xpoint, ypoint].axes.get_xaxis()
@@ -65,6 +97,8 @@ def plot_subtraction_ratio(x_values, y_values, xpoint, ypoint):
     # set visibility of y-axis as False
     yax = axes[xpoint, ypoint].get_yaxis()
     yax = yax.set_visible(False)
+
+#    plt.text(0,6, 0.8, "{:02d}".format(int(indx)))
 
 
  
@@ -85,7 +119,16 @@ if __name__ == "__main__":
     SRC    = np.zeros((N,1024))
     SRCcal = np.zeros((N,1024))
 
-    x_values = np.arange(0, 1024)
+    x_values = np.zeros(1024)
+
+    if N==25:
+        # 5x5
+        spiral_index = [[2,2],  [2,3],  [1,3],  [1,2],  [1,1],  [2,1],  [3,1],  [3,2],  [3,3],  [3,4],  [2,4],  [1,4],  [0,4],  [0,3],  [0,2],  [0,1],  [0,0],  [1,0],  [2,0],  [3,0],  [4,0],  [4,1],  [4,2],  [4,3],  [4,4]]
+    elif N==9:
+        # 3x3
+        spiral_index = [[1,1],  [1,2],  [0,2],  [0,1],  [0,0],  [1,0],  [2,0],  [2,1],  [2,2],]
+
+
 
     i=0
     for scanID in range(start, stop+1):
@@ -93,12 +136,12 @@ if __name__ == "__main__":
         srcs = "ACS3_SRC_"+str(scanID)+"_DEV4_INDX*_NINT*.txt"
 
         # x, y[i] spectra for [i]th spiral map pointing
-        SRC[i] = read_and_average_files(srcs, n_lines_header=25)
+        x_values, SRC[i] = read_and_average_files(srcs, n_lines_header=25)
         i+=1
 
     # Calculate the subtraction ratio
     for i in range(0,N):
-        SRCcal[i] = (SRC[i] - SRC[24]) / SRC[24]
+        SRCcal[i] = (SRC[i] - SRC[3]) / SRC[3]
     
         # despike
         newspec = []
@@ -111,15 +154,17 @@ if __name__ == "__main__":
 
         else:
             newspec = SRCcal[i] 
-
         SRCcal[i] = newspec
+
+        # DC offset
+        SRCcal[i] = SRCcal[i] - np.mean(SRCcal[i])
 
     i=0
     fig, axes = plt.subplots(int(m.sqrt(N)), int(m.sqrt(N)))
     # Plot the result with customized axis labels and limits
-    for xpoint in range(0,int(m.sqrt(N))):
-        for ypoint in range(0,int(m.sqrt(N))):
-            plot_subtraction_ratio(x_values, SRCcal[i], xpoint, ypoint)
-            i+=1
+    for indx in range(0, N):
+      xpoint = spiral_index[indx][0]
+      ypoint = spiral_index[indx][1]
+      plot_subtraction_ratio(x_values, SRCcal[indx], xpoint, ypoint, int(indx))
     plt.show()
 
