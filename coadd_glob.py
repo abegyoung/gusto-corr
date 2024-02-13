@@ -28,13 +28,11 @@ def read_and_average_files(file_pattern, n_lines_header=0):
         second_column = data[:, 1]
 
         # Check if all values in the second column are zero or NaN
-        if not (np.std(second_column[200:400])>300000 or np.all(second_column == 0) or np.any(np.isnan(second_column))):
+        if not (np.std(second_column[42:62])>20000 or np.all(second_column == 0) or np.any(np.isnan(second_column))):
             all_first_columns.append(first_column)
             valid_second_columns.append(second_column)
-
-        i+=1
-
-    #print(i)
+        else:
+          print("Throwing out ", file, "with stddev ", np.std(second_column[42:62]))
 
     if not valid_second_columns:
         print("All second columns are zero or contain NaN values. No valid data for averaging.")
@@ -49,6 +47,25 @@ def read_and_average_files(file_pattern, n_lines_header=0):
     average_second_column = np.nanmean(valid_second_columns, axis=0)
 
     return average_first_column, average_second_column
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def plot_subtraction_ratio(x_values, subtraction_ratio, x_limit, y_limit):
     global num
@@ -110,8 +127,8 @@ if __name__ == "__main__":
         # Set limits on the x and y axes
         #subtraction_ratio[201:204] = subtraction_ratio[200]
         #subtraction_ratio[131:137] = subtraction_ratio[130]
-        x_limit = (500, 3500)  # Replace xmin and xmax with your desired values
-        y_limit = (-0.005, 0.025)
+        x_limit = (000, 5000)  # Replace xmin and xmax with your desired values
+        y_limit = (-0.005, 0.005)
         spec = subtraction_ratio-subtraction_ratio[250]
 
         # despike

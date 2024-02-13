@@ -2,6 +2,7 @@
 for i in `seq 6589 4 6782`;do python3 ../coadd_glob.py "ACS3_SRC_0$i*DEV4*" "ACS3_REF_0`echo $i-1|bc`*DEV4*";done
 
 # make a movie
+ffmpeg -r 2 -i NGC3603-%02d.png -i palette.png -lavfi paletteuse test.gif
 ffmpeg -r 2 -f image2 -s 640x480 -i NGC3603-%02d.png -vcodec libx264 -crf 25  -pix_fmt yuv420p test.mp4
 
 # make a 7x7 plot (uncomment thumbnails in coadd_glob

@@ -123,7 +123,7 @@ void const callback(struct inotify_event *event, const char *directory){
 
    // Find scanID from filename
    // TODO: combine the file type and scanID from filename 
-   int scanID;
+   int scanID = -1;
    int dataN;
    char *token;
    int position = 0;
@@ -136,7 +136,7 @@ void const callback(struct inotify_event *event, const char *directory){
         token = strtok(NULL, "_");
 
         if (position == 1 ) {      //get scanID
-            scanID = atoi(token);
+            if(atoi(token)>0) scanID = atoi(token);
             printf("The scanID is: %d\n", scanID);
         }
 
@@ -150,14 +150,13 @@ void const callback(struct inotify_event *event, const char *directory){
 
 
    // Build a regex with the range of the previous 8 scanID #s
-   char scanIDregex[60];
+   char scanIDregex[512];
    int pos = 0;
    pos += sprintf(&scanIDregex[pos], "(");
-   for (int k=0; k<7; k++){
+   for (int k=0; k<30; k++){
       pos += sprintf(&scanIDregex[pos], "%d|", scanID-k);
    }
-   pos += sprintf(&scanIDregex[pos], "%d|", scanID-7);
-   pos += sprintf(&scanIDregex[pos], "%d)", 6777);
+   pos += sprintf(&scanIDregex[pos], "%d)", scanID-30);
    printf("%s\n", scanIDregex);
 
 
@@ -298,9 +297,9 @@ void const callback(struct inotify_event *event, const char *directory){
          fread(&value, 4, 1, fp);
          corr.II[i] = value;
          fread(&value, 4, 1, fp);
-         corr.IQ[i] = value;
-         fread(&value, 4, 1, fp);
          corr.QI[i] = value;
+         fread(&value, 4, 1, fp);
+         corr.IQ[i] = value;
          fread(&value, 4, 1, fp);
          corr.QQ[i] = value;
       }
@@ -407,7 +406,7 @@ void const callback(struct inotify_event *event, const char *directory){
       printf("CORRTIME is %.6f\n", (corr.corrtime*256.)/(5000.*1000000.));
       printDateTimeFromEpoch((long long) UNIXTIME);
       printf("UNIT is %d\n", UNIT);
-      printf("DEV  is %d\n",   DEV); 
+      printf("DEV  is %d\n",  DEV); 
       printf("NINT is %d\n", NINT);
       printf("%.2f %.2f %.2f %.2f\n",  (double)corr.Ihi/(double)corr.corrtime, \
                                        (double)corr.Qhi/(double)corr.corrtime, \
@@ -419,7 +418,7 @@ void const callback(struct inotify_event *event, const char *directory){
       // current scanID, and scanID used for cal
       printf("The cal  is from scanID: %d\n", influxReturn.scanID);
       printf("The data is from scanID: %d\n", scanID);
-      if(influxReturn.scanID==0 ){
+      if( influxReturn.scanID==0 ){
         printf("######################## ERROR ###########################\n");
         printf("#                                                        #\n");
         printf("#           Error, calibration was no good!              #\n");
