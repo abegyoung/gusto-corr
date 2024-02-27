@@ -56,6 +56,40 @@ On FreeBSD, `fswatch` can be installed using [pkg]:
 # pkg install fswatch-mon
 ```
 
+
+### InfluxDB
+InfluxDB is a time series database which handles precisely timed writes with high loads, perfect for an observatory continually writing time-stamped observations at a high rate.  InfluxDB OSS is a free Open Source version of the product.
+
+There are a few choices for the Influx Database install.  Mostly old style V1.8 which we run on the GUSTO instrument because its the last version which is 32-bit compatible, or V2.0 and above which are incompatible but produce nice web interface graphs.  You may recreate on the ground the flight database in either version, however the corrspec code uses the V1.8 query interface.
+
+You may find the Influx DB install at: https://docs.influxdata.com/influxdb/v1/introduction/download/
+
+Click the link and follow the instructions to download Influx V1.8 for Mac, Linux, or *shudder* Windows PowerShell.
+
+Once installed, edit the config file to allow an infinite number of series instead of the default one million by setting:
+
+```
+[data]
+  max-series-per-database = 0
+```
+
+Starting with a blank canvas, import the first 28 days of GUSTO with the portable format from soral: `influx_gustoDBlp_backup.tar.gz`.  Untarred, this will create a directory `backup`.  Also get the compressed binary format export from Jan28 - Feb 26: `export_v18_18-01-2024.dat`
+
+Start influxd from the command line using ``sudo influxd``, then issue:
+```
+young@Abrams-MBP ~ % sudo influxd restore -portable ./backup
+young@Abrams-MBP ~ % influx -database 'gustoDBlp' -host 'localhost' -port '8086' -compressed -import -path Desktop/export_v18_02_26_2024.dat
+```
+
+This should have created a new database, and imported the compressed binary exports from the gondola.  You should now have a gustoDBlp and a gustoDBlp2.  Merging these two databases is trivial with a SELECT INTO.
+
+From the influx command line
+```
+SELECT * INTO "gustoDBlp"."autogen".:MEASUREMENT FROM "gustoDBlp2"."autogen"./.*/ WHERE time > now() - 2w AND time < now() - 1w GROUP BY *
+```
+
+
+
 ### corrspec
 To compile `corrspec`
 
