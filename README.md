@@ -88,6 +88,8 @@ From the influx command line
 SELECT * INTO "gustoDBlp"."autogen".:MEASUREMENT FROM "gustoDBlp2"."autogen"./.*/ WHERE time > now() - 2w AND time < now() - 1w GROUP BY *
 ```
 
+You'll need to process about a week at a time using ``WHERE time > now()`` blocks so as not to run out of memory.
+
 
 
 ### corrspec
@@ -110,6 +112,8 @@ In another window:
 ```
 cp data/out.lags .
 ```
+or use a ``touch file`` to modify the file Attributes triggering the file system watcher to begin processing the file.
+
 Output:
 ```
 young@Abrams-MacBook-Pro gusto-corr % ./corrspec 
