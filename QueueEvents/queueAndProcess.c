@@ -20,7 +20,6 @@ pthread_cond_t event_queue_cond = PTHREAD_COND_INITIALIZER;
 void enqueueEvent(struct fsw_cevent *event) {
     n+=1;
     printf("enqueuing.. %d events in Q now\n", n);
-
     struct EventQueue *newNode = (struct EventQueue *)malloc(sizeof(struct EventQueue));
     if (newNode == NULL) {
         perror("Error allocating memory");
@@ -50,7 +49,6 @@ void enqueueEvent(struct fsw_cevent *event) {
 
 // Dequeue an event
 struct fsw_cevent *dequeueEvent() {
-
     pthread_mutex_lock(&event_queue_mutex);
 
     // Wait until a new event is available
@@ -83,6 +81,7 @@ struct fsw_cevent *dequeueEvent() {
     return event;
 }
 
+
 // Callback function to process the file
 void callback(const struct fsw_cevent *event, const unsigned int event_num, void *data) {
     // Make a copy of the fsw_cevent structure
@@ -97,6 +96,7 @@ void callback(const struct fsw_cevent *event, const unsigned int event_num, void
     // Enqueue the copied event for later processing
     enqueueEvent(event_copy);
 }
+
 
 
 // Function to start the file system monitor in a separate thread
@@ -120,16 +120,12 @@ int main() {
     const char *directory = "./dir";
 
     // Initialize the session with the default monitor type
-    FSW_HANDLE fsw_handle = fsw_init_session(system_default_monitor_type);
+    fsw_init_library();
+    FSW_HANDLE fsw_handle = fsw_init_session(fsevents_monitor_type);
 
     // Set the callback function
-    fsw_set_callback(fsw_handle, (void (*)(const struct fsw_cevent * const, const unsigned int, void *))callback, NULL);
-
-   // Add event types
-   int flag = 1<<6;
-   struct fsw_event_type_filter cevent_filter;
-   cevent_filter.flag= flag;
-   fsw_add_event_type_filter(fsw_handle, cevent_filter);
+    void *data;
+    fsw_set_callback(fsw_handle, (void (*)(const struct fsw_cevent * const, const unsigned int, void *))callback, data);
 
     // Add a watch to the directory
     if (fsw_add_path(fsw_handle, directory) < 0) {

@@ -215,7 +215,9 @@ void const callback(struct inotify_event *event, const char *directory){
       corr.Ierr     = header[12];
       corr.Qerr     = header[13];
 
-      if (corr.Ierr!=0 || corr.Qerr!=0 )
+      if (corr.Ierr!=0 || corr.Qerr!=0 || \
+           corr.Ihi==0 ||  corr.Qhi==0 || corr.Ilo==0 || corr.Qlo==0 || \
+           (corr.corrtime*256.)/(5000.*1000000.)<0.1 )
       {
          printf("######################## ERROR ###########################\n");
          printf("#                                                        #\n");

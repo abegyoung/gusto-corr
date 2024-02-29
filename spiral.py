@@ -78,7 +78,7 @@ def read_and_average_files(file_pattern, n_lines_header=0):
         second_column = data[:, 1]
 
         # Check if all values in the second column are zero or NaN
-        if not (np.std(second_column[42:62])>20000 or np.all(second_column == 0) or np.any(np.isnan(second_column))):
+        if not (np.std(second_column[42:62])>50000 or np.all(second_column == 0) or np.any(np.isnan(second_column))):
             all_first_columns.append(first_column)
             valid_second_columns.append(second_column)
         else:
@@ -180,7 +180,7 @@ if __name__ == "__main__":
     global axes
     global centerIF
 
-    centerIF=1300
+    centerIF=1900
 
     # Get file patterns from command-line arguments
     parser = argparse.ArgumentParser()

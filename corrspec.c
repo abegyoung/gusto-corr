@@ -39,7 +39,7 @@ int main(int argc, char **argv) {
    /* Initialize either fswatch or inotify */
 
 #ifdef USE_FSWATCH
-   int flag = 1<<6;
+   int flag = 1<<9;
    struct fsw_event_type_filter cevent_filter;
 
    // Initialize the session
