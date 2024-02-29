@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdint.h>
 
 #define BUFFER_SIZE 160
 #define RAD2DEG (180./3.14159)
@@ -97,6 +98,15 @@ int main(int argc, char **argv) {
     int bytes_to_read=156;
     int bytes_returned=bytes_to_read;
 
+    int scanID = 0;
+    char *filename= (char *)malloc(sizeof(char) * 32);
+    strcat(filename, argv[1]);
+    char* token = strtok(filename, "_");
+    token = strtok(NULL, ".");
+    if (token != NULL) {
+        scanID = atoi(token);
+    }
+
     while (bytes_returned == bytes_to_read) {
         // Receive data from the client
         bytes_returned = fread(&buffer, 1, bytes_to_read, fp);
@@ -140,7 +150,8 @@ int main(int argc, char **argv) {
         //printf("RA= %s\t",   rad2hms(pos.here.ra));
         //printf("LAT= %s\n",rad2dms(pos.here.dec));
         printf("%f\t",   RAD2DEG*pos.here.ra);
-        printf("%f\n",   RAD2DEG*pos.here.dec);
+        printf("%f\t",   RAD2DEG*pos.here.dec);
+        printf("%d\n",   scanID);
 
         //printf("fixNum= %d\n",  (pos.fix.fixNum));
         //printf("StrCnt= %d\n\n",(pos.fix.starCount));
