@@ -11,6 +11,7 @@
 #include <arpa/inet.h>
 #include "corrspec.h"
 #include "callback.h"
+#include <glob.h>
 
 
 struct Spectrum spec[4];
@@ -19,9 +20,6 @@ int main(int argc, char **argv) {
 
    
    void *data;
-
-   // Set the directory to monitor
-   const char *directory = argv[1];
 
    printf("readying fft\n");
 
@@ -39,6 +37,9 @@ int main(int argc, char **argv) {
    /* Initialize either fswatch or inotify */
 
 #ifdef USE_FSWATCH
+   // Set the directory to monitor
+   const char *directory = argv[1];
+
    int flag = 1<<9;
    struct fsw_event_type_filter cevent_filter;
 
@@ -75,7 +76,10 @@ int main(int argc, char **argv) {
 
 
 
-#ifdef USE_INOTIFY
+#if defined(USE_INOTIFY) && !defined(NO_FS)
+   // Set the directory to monitor
+   const char *directory = argv[1];
+
 
    char buffer[EVENT_BUF_LEN];
    int fd = inotify_init();
@@ -89,12 +93,23 @@ int main(int argc, char **argv) {
 
 #endif
 
+#ifdef NO_FS
 
-   for(int i=0; i<4; i++){
-     fftw_destroy_plan(spec[i].p);
-     fftw_free(spec[i].in);
-     fftw_free(spec[i].out);
+   glob_t glob_result;
+
+   if(glob(argv[1], GLOB_NOSORT, NULL, &glob_result) != 0){
+      perror("Error in glob\n");
+      return 1;
    }
+
+   for (size_t i=0; i < glob_result.gl_pathc; ++i){
+      // Process each file
+      printf("processing file: %s\n", glob_result.gl_pathv[i]);
+      callback( glob_result.gl_pathv[i]);
+
+   }
+
+#endif
 
    return 0;
 }
