@@ -4,7 +4,7 @@ import glob
 import matplotlib.pyplot as plt
 from PyAstronomy import pyasl
 
-doDespike = True
+doDespike = False
 
 def read_and_average_files(file_pattern, n_lines_header=0):
     # Get a list of files that match the specified pattern
@@ -105,8 +105,8 @@ if __name__ == "__main__":
         # Set limits on the x and y axes
         #subtraction_ratio[201:204] = subtraction_ratio[200]
         #subtraction_ratio[131:137] = subtraction_ratio[130]
-        x_limit = (800, 3000)  # Replace xmin and xmax with your desired values
-        y_limit = (-0.02, 0.03)
+        x_limit = (800, 1400)  # Replace xmin and xmax with your desired values
+        y_limit = (-0.005, 0.005)
         spec = subtraction_ratio-subtraction_ratio[250]
 
         # despike
