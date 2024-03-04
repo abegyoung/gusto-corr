@@ -102,6 +102,19 @@ A file is produced with B1 and B2 frequency in MHz which corresponds to zero dop
 
 IF and scanID may then be read into InfluxDB for automated emission line intensities.
 
+example:
+```
+1900    1900    27704   RCW120
+1900    1900    27718   G002
+1100    1100    27883   RCW120
+1100    1100    27897   G334
+1100    1100    27969   G334
+1300    1300    28060   LMC
+1900    1900    28169   RCW120
+1900    1900    28183   G002
+1100    1100    28233   G334
+```
+
 
 ### corrspec
 To compile `corrspec`
