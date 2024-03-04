@@ -55,7 +55,7 @@ void const callback(const fsw_cevent *events,const unsigned int event_num, void 
 
 #endif
 
-#if defined(USE_INOTIFY) && !defined(NO_FS)
+#if USE_INOTIFY
 
 void const callback(struct inotify_event *event, const char *directory){
 

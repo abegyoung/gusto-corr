@@ -76,7 +76,7 @@ int main(int argc, char **argv) {
 
 
 
-#if defined(USE_INOTIFY) && !defined(NO_FS)
+#if USE_INOTIFY
    // Set the directory to monitor
    const char *directory = argv[1];
 
