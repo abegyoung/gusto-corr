@@ -23,8 +23,14 @@ corrspec: corrspec.c corrspec.h callback.c callback.h
 	$(CXX) -c influx.c $(INCLUDES) $(CXXFLAGS) $(LIBS)
 	$(CXX) -o corrspec corrspec.o callback.o influx.o $(INCLUDES) $(CXXFLAGS) $(LIBS)
 
-all: corrspec
+corrspec-nofs: corrspec-nofs.c corrspec-nofs.h callback.c callback.h
+	$(CXX) -c callback.c $(INCLUDES) $(CXXFLAGS) $(LIBS) -DNO_FS
+	$(CXX) -c corrspec-nofs.c $(INCLUDES) $(CXXFLAGS) $(LIBS) -DNO_FS
+	$(CXX) -c influx.c $(INCLUDES) $(CXXFLAGS) $(LIBS)
+	$(CXX) -o corrspec-nofs corrspec-nofs.o callback.o influx.o $(INCLUDES) $(CXXFLAGS) $(LIBS) -DNO_FS
+
+all: corrspec corrspec-nofs
 
 clean:
-	rm corrspec *.o
+	rm corrspec corrspec-nofs *.o
 

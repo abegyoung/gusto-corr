@@ -39,7 +39,7 @@ struct corrType
 */
 #endif
 
-#ifdef USE_INOTIFY
+#if defined(USE_INOTIFY) && !defined(NO_FS)
 
    #define EVENT_SIZE (sizeof (struct inotify_event))
    #define EVENT_BUF_LEN (1024*(EVENT_SIZE+16))
@@ -49,3 +49,8 @@ struct corrType
 
 #endif
 
+#ifdef NO_FS
+
+void const callback(char *filein);
+
+#endif

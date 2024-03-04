@@ -39,7 +39,7 @@ char nthdigit(int x, int n)
 
 
 // Callback function to process the file
-// Function definition changes for FSWATCH or INOTIFY
+// Function definition changes for FSWATCH or INOTIFY or NO_FS
 #ifdef USE_FSWATCH
 
 void const callback(const fsw_cevent *events,const unsigned int event_num, void *data){
@@ -55,7 +55,7 @@ void const callback(const fsw_cevent *events,const unsigned int event_num, void 
 
 #endif
 
-#ifdef USE_INOTIFY
+#if defined(USE_INOTIFY) && !defined(NO_FS)
 
 void const callback(struct inotify_event *event, const char *directory){
 
@@ -63,6 +63,14 @@ void const callback(struct inotify_event *event, const char *directory){
    snprintf(filein, 128, "%s/%s", directory, event->name);
 
    char *name = event->name;
+
+#endif
+
+#ifdef NO_FS
+
+void const callback(char *filein){
+
+   char *name = filein;
 
 #endif
 
@@ -233,11 +241,13 @@ void const callback(struct inotify_event *event, const char *directory){
       for (int k=0; k<4; k++){
          curl = init_influx();
          sprintf(query, "&q=SELECT * FROM \"ACS%d_DEV%d%s\" WHERE \"scanID\"=~/%s/  \
-                                                             ORDER BY time DESC LIMIT 1", \
+                                                             ORDER BY time DESC LIMIT 10", \
                                           UNIT-1, DEV, query_list[k], scanIDregex);
 
          //dacV[k] = influxWorker(curl, query);
          influxReturn = influxWorker(curl, query);
+         //influxReturn.scanID integer
+         //influxReturn.value  float
          dacV[k] = influxReturn.value;
       }
       // don't trust myself to rewrite the below, just copy from vector into floats
