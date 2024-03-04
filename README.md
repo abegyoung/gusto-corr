@@ -90,6 +90,16 @@ SELECT * INTO "gustoDBlp"."autogen".:MEASUREMENT FROM "gustoDBlp2"."autogen"./.*
 
 You'll need to process about a week at a time using ``WHERE time > now()`` blocks so as not to run out of memory.
 
+###
+findIF.sh
+
+An ICE config variable called ``firstIF`` was set by the observer whenever GUSTO tracked a new region of the Sky.  For example G333 which was done very early on used 900 MHz as the zero velocity based on the regions VLSR and our own velocity.
+
+A somewhat edited ICEobs.log is fed to ``findIF.sh`` and the target names compared to GUSTO.cat which has the VLSR for each target.
+
+A file is produced with B1 and B2 frequency in MHz which corresponds to zero doppler shift velocity releative to VLSR, the first scanID which uses the new synthesizer tuning, and the target name.
+
+IF and scanID may then be read into InfluxDB for automated emission line intensities.
 
 
 ### corrspec
