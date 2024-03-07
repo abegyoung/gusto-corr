@@ -74,6 +74,7 @@ def plot_subtraction_ratio(x_values, subtraction_ratio, x_limit, y_limit):
 
     plt.tight_layout()
     plt.text(0.8, 0.9, "{:02d}".format(num), transform=a.transAxes)
+    plt.savefig('NGC6334-{:05}.png'.format(num))
 
     plt.show()
 

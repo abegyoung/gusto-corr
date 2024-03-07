@@ -14,6 +14,7 @@
 # TODO: need to find the nearest in time REF
 #
 
+import os
 import glob
 import numpy as np
 import datetime
@@ -22,6 +23,7 @@ from influxdb import InfluxDBClient
 
 from astropy import units as u
 from astropy.coordinates import SkyCoord
+from astropy.modeling import models, fitting
 
 import matplotlib.pyplot as plt
 from PyAstronomy import pyasl
@@ -50,7 +52,7 @@ def read_and_average_files(files, n_lines_header=0):
         second_column = data[:, 1]
 
         # Check if all values in the second column are zero or NaN
-        if not (np.std(second_column[42:62])>50000 or np.all(second_column == 0) or np.any(np.isnan(second_column))):
+        if not (np.std(second_column[42:62])>40000 or np.all(second_column == 0) or np.any(np.isnan(second_column))):
             all_first_columns.append(first_column)
             valid_second_columns.append(second_column)
         else:
@@ -71,12 +73,18 @@ def read_and_average_files(files, n_lines_header=0):
     return average_first_column, average_second_column
 
 def plot_subtraction_ratio(x_values, subtraction_ratio, x_limit, y_limit):
+    global numi
+    global numj
     #my_dpi=96
     #plt.figure(figsize=(120/my_dpi, 120/my_dpi), dpi=my_dpi)
 
     plt.figure()
 
     # Plot the subtraction ratio with the first column on the x-axis
+    #p1 = Polynomial1D(3)
+    #pfit = fitting.LiearLSQFFitter()
+    #new_model = 
+
     plt.step(x_values, subtraction_ratio)
     plt.xlabel('MHz')
     plt.ylabel('(S-R) / R (+ DC offset)')
@@ -93,11 +101,19 @@ def plot_subtraction_ratio(x_values, subtraction_ratio, x_limit, y_limit):
     plt.ylim(y_limit)
 
     plt.tight_layout()
-    #plt.text(0.8, 0.9, "{:02d}".format(num), transform=a.transAxes)
+    plt.text(0.8, 0.9, "{:05d}".format(numi), transform=a.transAxes)
+    plt.text(0.8, 0.8, "{:05d}".format(numj), transform=a.transAxes)
+    plt.savefig('NGC6334-{:05}-{:05}.png'.format(numi,numj))
+    plt.close()
 
-    plt.show()
+    #plt.show()
 
 
+######################################################################################o
+global numi
+global numj
+numi = 0
+numj = 0
 
 username = ''
 password = ''
@@ -114,8 +130,8 @@ size = 20*u.arcsec
 c = SkyCoord(ra, dec, frame='icrs')
 
 # half-image size
-ra_img = 2*u.arcmin
-dec_img = 2*u.arcmin
+ra_img = 5*u.arcmin
+dec_img = 5*u.arcmin
 
 
 # Use influxdb for V1.0
@@ -133,31 +149,71 @@ N_dec     = int(dec_img.to(u.arcmin).value/size.to(u.arcmin).value)
 dec_indx = np.linspace(start_dec, end_dec, N_dec)
 
 for ra in ra_indx:
+    numi += 1
+    numj = 0
     for dec in dec_indx:
+        numj += 1
         print('{:f}'.format(ra), '{:f}'.format(dec))
+        # find all points in udpPointing where we pointed at ra, dec
         myquery = f'SELECT * FROM "udpPointing" WHERE RA<{(ra +size.to(u.deg).value)}  AND \
                                                       RA>{(ra -size.to(u.deg).value)}  AND \
                                                      DEC<{(dec+size.to(u.deg).value)}  AND \
                                                      DEC>{(dec-size.to(u.deg).value)}'
         points = client.query(myquery).get_points()
 
-        files=[]
+        src_files=[]
+        ref_files=[]
+        # For loop over all of these pointings
+        # POINTS contains a (time, scanID) for each pointing at (ra,dec)
         for point in points:
+            # get a time object at a single pointing
             time_string = point.get('time')
             nofrac, frac = time_string.rsplit('.')
             nofrac_dt = datetime.datetime.strptime(nofrac, '%Y-%m-%dT%H:%M:%S')
             dt = nofrac_dt.replace(microsecond=int(frac.strip('Z')))
   
+            # Find source files with same scanID within 1 second of that point
+            # restrict spectra search to the current scanID
+            # for ~ single beam spacing, usually results in ~ 10 spectra
             file_pattern = f'../GUSTO-DATA/spectra/ACS3_OTF_{point.get("scanID")}_DEV4_INDX*'
             search_files = glob.glob(file_pattern)
             for file in search_files:
                 fp = open(file, 'r')
                 unixtime = fp.readline().split('\t')[1]
                 fp.close()
-                if(int(unixtime) == int(nofrac_dt.timestamp())):
-                    print(file)
-                    files.extend(glob.glob(file))
-        read_and_average_files(files, n_lines_header=25)
+                # look through these spectra for matching times
+                if(int(unixtime) == int(nofrac_dt.timestamp())):  # Find spectra within 1 sec
+                    src_files.extend(glob.glob(file)) # add spectra filename to array
+
+            # Find suitable reference files with equal or earlier scanID
+            # TODO: base on time and select earlier OR later reference scan
+            file_pattern = f'../GUSTO-DATA/spectra/ACS3_REF_{point.get("scanID")}_DEV4_INDX*'
+            search_files = glob.glob(file_pattern)
+
+            last=0
+            while not ref_files:
+                for file in search_files:
+                    if( os.path.isfile(file) ):
+                        ref_files.extend(glob.glob(file))
+                file_pattern = f'../GUSTO-DATA/spectra/ACS3_REF_{str(int(point.get("scanID"))-last)}_DEV4_INDX*'
+                search_files = glob.glob(file_pattern)
+                last-=1
+        if not src_files or not ref_files:
+            print("no files")
+            exit
+        else:
+            srcx, srcy = read_and_average_files(src_files, n_lines_header=25)   # Average SRC
+       
+            for srcf in src_files:
+                print(srcf)
+            for reff in ref_files:
+                print(reff)
+
+            refx, refy = read_and_average_files(ref_files, n_lines_header=25)   # Average REF
+
+            subtraction_ratio = (srcy - refy ) / refy
+            spec = subtraction_ratio - np.mean(subtraction_ratio[205:410])
+            plot_subtraction_ratio(srcx, spec, (900, 1300), (-.005, .015))
 
   
 
