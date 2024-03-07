@@ -148,7 +148,7 @@ for ra in ra_indx:
             nofrac_dt = datetime.datetime.strptime(nofrac, '%Y-%m-%dT%H:%M:%S')
             dt = nofrac_dt.replace(microsecond=int(frac.strip('Z')))
   
-            file_pattern = f'/home/young/Desktop/GUSTO-DATA/spectra/ACS3_OTF_{point.get("scanID")}_DEV4_INDX*'
+            file_pattern = f'../GUSTO-DATA/spectra/ACS3_OTF_{point.get("scanID")}_DEV4_INDX*'
             search_files = glob.glob(file_pattern)
             for file in search_files:
                 fp = open(file, 'r')
