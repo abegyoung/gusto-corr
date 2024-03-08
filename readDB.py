@@ -16,6 +16,7 @@
 
 import os
 import glob
+import time
 import numpy as np
 import datetime
 from influxdb import InfluxDBClient
@@ -23,7 +24,6 @@ from influxdb import InfluxDBClient
 
 from astropy import units as u
 from astropy.coordinates import SkyCoord
-from astropy.modeling import models, fitting
 
 import matplotlib.pyplot as plt
 from PyAstronomy import pyasl
@@ -52,7 +52,7 @@ def read_and_average_files(files, n_lines_header=0):
         second_column = data[:, 1]
 
         # Check if all values in the second column are zero or NaN
-        if not (np.std(second_column[42:62])>40000 or np.all(second_column == 0) or np.any(np.isnan(second_column))):
+        if not (np.std(second_column[42:62])>30000 or np.all(second_column == 0) or np.any(np.isnan(second_column))):
             all_first_columns.append(first_column)
             valid_second_columns.append(second_column)
         else:
@@ -81,11 +81,19 @@ def plot_subtraction_ratio(x_values, subtraction_ratio, x_limit, y_limit):
     plt.figure()
 
     # Plot the subtraction ratio with the first column on the x-axis
-    #p1 = Polynomial1D(3)
-    #pfit = fitting.LiearLSQFFitter()
-    #new_model = 
+    z = np.polyfit(x_values[185:267], subtraction_ratio[185:267], 3)
+    p = np.poly1d(z)
+    xp = np.linspace(1000, 1300, 10)
 
-    plt.step(x_values, subtraction_ratio)
+    #plt.step(x_values, subtraction_ratio)
+    #plt.plot(xp, p(xp), '-')
+    flatx = np.zeros(83)
+    flaty = np.zeros(83)
+    for i in range(0, 83):
+        flatx[i] = x_values[i+185]
+        flaty[i] = subtraction_ratio[i+185] - p(flatx[i]) 
+    plt.step(flatx, flaty)
+
     plt.xlabel('MHz')
     plt.ylabel('(S-R) / R (+ DC offset)')
     a = plt.gca()
@@ -101,8 +109,8 @@ def plot_subtraction_ratio(x_values, subtraction_ratio, x_limit, y_limit):
     plt.ylim(y_limit)
 
     plt.tight_layout()
-    plt.text(0.8, 0.9, "{:05d}".format(numi), transform=a.transAxes)
-    plt.text(0.8, 0.8, "{:05d}".format(numj), transform=a.transAxes)
+    plt.text(0.9, 0.95, "{:05d}".format(numi), transform=a.transAxes)
+    plt.text(0.9, 0.90, "{:05d}".format(numj), transform=a.transAxes)
     plt.savefig('NGC6334-{:05}-{:05}.png'.format(numi,numj))
     plt.close()
 
@@ -122,16 +130,21 @@ retention_policy = 'autogen'
 bucket = f'{database}/{retention_policy}'
 
 # NGC6334 coordinates
-ra  = '+17h20m50s'
-dec = '-36d06m54s'
+#Walsh 2007 MOPRA 12CO coordinates 5' x 5'
+ra  = '+17h20m54s'
+dec = '-35d46m12s'
+
+# NGC6334 coordinates
+ra  = '+17h20m23s'
+dec = '-35d55m26s'
 
 # half-beam size
 size = 20*u.arcsec
 c = SkyCoord(ra, dec, frame='icrs')
 
 # half-image size
-ra_img = 5*u.arcmin
-dec_img = 5*u.arcmin
+ra_img = 10*u.arcmin
+dec_img = 10*u.arcmin
 
 
 # Use influxdb for V1.0
@@ -212,8 +225,8 @@ for ra in ra_indx:
             refx, refy = read_and_average_files(ref_files, n_lines_header=25)   # Average REF
 
             subtraction_ratio = (srcy - refy ) / refy
-            spec = subtraction_ratio - np.mean(subtraction_ratio[205:410])
-            plot_subtraction_ratio(srcx, spec, (900, 1300), (-.005, .015))
+            spec = subtraction_ratio - np.mean(subtraction_ratio[185:267])
+            plot_subtraction_ratio(srcx, spec, (900, 1300), (-.0015, .0030))
 
   
 
