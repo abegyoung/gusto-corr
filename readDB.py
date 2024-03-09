@@ -92,10 +92,15 @@ def plot_subtraction_ratio(x_values, subtraction_ratio, x_limit, y_limit):
     for i in range(0, 83):
         flatx[i] = x_values[i+185]
         flaty[i] = subtraction_ratio[i+185] - p(flatx[i]) 
-    plt.step(flatx, flaty)
+    flaty[201-185] = 0
+    flaty[202-185] = 0
+    plt.step((flatx-1100)*0.158, 2*(273+13)*1.4*flaty) # km/s and T_A^* (K)
+    plt.hlines(0, -30, 30)
 
-    plt.xlabel('MHz')
-    plt.ylabel('(S-R) / R (+ DC offset)')
+    #plt.xlabel('MHz')
+    #plt.ylabel('(S-R) / R (+ DC offset)')
+    plt.xlabel('km/s')
+    plt.ylabel('$T^{*}_{A}$ (K)')
     a = plt.gca()
 
     # set visibility of x-axis as False
@@ -129,22 +134,22 @@ database = 'gustoDBlp'
 retention_policy = 'autogen'
 bucket = f'{database}/{retention_policy}'
 
-# NGC6334 coordinates
+# NGC6334 coordinates I
 #Walsh 2007 MOPRA 12CO coordinates 5' x 5'
 ra  = '+17h20m54s'
 dec = '-35d46m12s'
 
-# NGC6334 coordinates
-ra  = '+17h20m23s'
-dec = '-35d55m26s'
+# NGC6334 coordinates I(North)
+ra  = '+17h20m54s'
+dec = '-35d46m12s'
 
 # half-beam size
-size = 20*u.arcsec
+size = 25*u.arcsec
 c = SkyCoord(ra, dec, frame='icrs')
 
 # half-image size
-ra_img = 10*u.arcmin
-dec_img = 10*u.arcmin
+ra_img =  2.5*u.arcmin
+dec_img = 2.5*u.arcmin
 
 
 # Use influxdb for V1.0
@@ -211,6 +216,22 @@ for ra in ra_indx:
                 file_pattern = f'../GUSTO-DATA/spectra/ACS3_REF_{str(int(point.get("scanID"))-last)}_DEV4_INDX*'
                 search_files = glob.glob(file_pattern)
                 last-=1
+
+        # Before we leave, get a current-ish CAL temperature
+        # TODO: pass this temp along to the plot T-A-star
+        scans = f''
+        scanID = int(point.get("scanID"))
+        for i in range(1,6):
+           if(i!=5): scans = scans+'{:d}|'.format(scanID-2)
+           if(i==5): scans = scans+'{:d}'.format(scanID-2)
+           scanID+=1
+        myquery = 'SELECT last(*) FROM "HK_TEMP11" WHERE "scanID"=~/({:s})/'.format(scans)
+        points = client.query(myquery).get_points()
+        for point in points:
+            T_CAL = point.get('last_temp')
+        print(T_CAL)
+        print("Cal temp is {:f}".format(T_CAL))
+
         if not src_files or not ref_files:
             print("no files")
             exit
@@ -226,7 +247,7 @@ for ra in ra_indx:
 
             subtraction_ratio = (srcy - refy ) / refy
             spec = subtraction_ratio - np.mean(subtraction_ratio[185:267])
-            plot_subtraction_ratio(srcx, spec, (900, 1300), (-.0015, .0030))
+            plot_subtraction_ratio(srcx, spec, (-30, 30), (-1, 3))
 
   
 
