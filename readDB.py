@@ -52,7 +52,7 @@ def read_and_average_files(files, n_lines_header=0):
         second_column = data[:, 1]
 
         # Check if all values in the second column are zero or NaN
-        if not (np.std(second_column[42:62])>30000 or np.all(second_column == 0) or np.any(np.isnan(second_column))):
+        if not (np.std(second_column[42:62])>35000 or np.all(second_column == 0) or np.any(np.isnan(second_column))):
             all_first_columns.append(first_column)
             valid_second_columns.append(second_column)
         else:
@@ -75,6 +75,7 @@ def read_and_average_files(files, n_lines_header=0):
 def plot_subtraction_ratio(x_values, subtraction_ratio, x_limit, y_limit):
     global numi
     global numj
+    global integrated_intensity
     #my_dpi=96
     #plt.figure(figsize=(120/my_dpi, 120/my_dpi), dpi=my_dpi)
 
@@ -85,17 +86,35 @@ def plot_subtraction_ratio(x_values, subtraction_ratio, x_limit, y_limit):
     p = np.poly1d(z)
     xp = np.linspace(1000, 1300, 10)
 
+    # plot s-r/r and baseline fit
     #plt.step(x_values, subtraction_ratio)
     #plt.plot(xp, p(xp), '-')
+
     flatx = np.zeros(83)
     flaty = np.zeros(83)
+    # make a baseline-subtracted spectra
     for i in range(0, 83):
         flatx[i] = x_values[i+185]
         flaty[i] = subtraction_ratio[i+185] - p(flatx[i]) 
-    flaty[201-185] = 0
-    flaty[202-185] = 0
-    plt.step((flatx-1100)*0.158, 2*(273+13)*1.4*flaty) # km/s and T_A^* (K)
-    plt.hlines(0, -30, 30)
+    flaty[201-185] = 0 # blank bad freq
+    flaty[202-185] = 0 # blank bad freq
+    # x-axis scale (km/s)
+    #     (1MHz/1900GHz) * c = 0.158 km/s
+    # y-axis scale (K):
+    #     for DSB: TA* ~= 2 * (T_hot) * y-factor * (s-r/r)
+    #plt.plot((flatx-1100)*0.158, 2*(273+13)*1.4*flaty, drawstyle='steps', linewidth=3)
+    # @ 1.1GHz, y=HOT/REF => Tsys=1.3*(273K-45K*y/(y-1)) = 800K with a 1.3 linearity factor
+    plt.plot((flatx-1100)*0.158, 800*flaty, drawstyle='steps', linewidth=3)
+
+    # remove non-zero
+    flaty[flaty<0]=0
+    integrated_intensity[numj-1, numi-1] = np.trapz(flaty)
+
+    # more conventionally:
+    # Tsys from T_HOT and T_Sky=45K
+    # Ta = Tsys * ( S-R / R )
+    # TODO: use the HOTs as REF only ratios can be up to ~ 12 minutes old
+    plt.hlines(0, -30, 30, linestyle='--', color='black')
 
     #plt.xlabel('MHz')
     #plt.ylabel('(S-R) / R (+ DC offset)')
@@ -114,8 +133,9 @@ def plot_subtraction_ratio(x_values, subtraction_ratio, x_limit, y_limit):
     plt.ylim(y_limit)
 
     plt.tight_layout()
-    plt.text(0.9, 0.95, "{:05d}".format(numi), transform=a.transAxes)
-    plt.text(0.9, 0.90, "{:05d}".format(numj), transform=a.transAxes)
+    plt.text(0.8, 0.95, "{:02f}".format(integrated_intensity[numj-1, numi-1]), transform=a.transAxes)
+    #plt.text(0.9, 0.95, "{:05d}".format(numi), transform=a.transAxes)
+    #plt.text(0.9, 0.90, "{:05d}".format(numj), transform=a.transAxes)
     plt.savefig('NGC6334-{:05}-{:05}.png'.format(numi,numj))
     plt.close()
 
@@ -128,6 +148,7 @@ global numj
 numi = 0
 numj = 0
 
+
 username = ''
 password = ''
 database = 'gustoDBlp'
@@ -139,18 +160,19 @@ bucket = f'{database}/{retention_policy}'
 ra  = '+17h20m54s'
 dec = '-35d46m12s'
 
-# NGC6334 coordinates I(North)
-ra  = '+17h20m54s'
-dec = '-35d46m12s'
+# NGC6334 coordinates SOFIA 120K line
+ra  = '+17h20m32s'
+dec = '-35d51m20s'
 
 # half-beam size
 size = 25*u.arcsec
 c = SkyCoord(ra, dec, frame='icrs')
 
 # half-image size
-ra_img =  2.5*u.arcmin
-dec_img = 2.5*u.arcmin
+ra_img =  30*u.arcmin
+dec_img = 30*u.arcmin
 
+# undersample map
 
 # Use influxdb for V1.0
 # https://influxdb-python.readthedocs.io/en/latest/index.html
@@ -158,13 +180,16 @@ client = InfluxDBClient('localhost', 8086, '', '', 'gustoDBlp')
 
 start_ra = c.ra.deg - ra_img.to(u.deg).value
 end_ra   = c.ra.deg + ra_img.to(u.deg).value
-N_ra     = int(ra_img.to(u.arcmin).value/size.to(u.arcmin).value)
+N_ra     = int(ra_img.to(u.arcmin).value/size.to(u.arcmin).value/9)
 ra_indx = np.linspace(start_ra, end_ra, N_ra)
 
 start_dec = c.dec.deg - dec_img.to(u.deg).value
 end_dec   = c.dec.deg + dec_img.to(u.deg).value
-N_dec     = int(dec_img.to(u.arcmin).value/size.to(u.arcmin).value)
+N_dec     = int(dec_img.to(u.arcmin).value/size.to(u.arcmin).value/9)
 dec_indx = np.linspace(start_dec, end_dec, N_dec)
+
+global integrated_intensity
+integrated_intensity = np.zeros(shape=(N_dec, N_ra))
 
 for ra in ra_indx:
     numi += 1
@@ -179,8 +204,12 @@ for ra in ra_indx:
                                                      DEC>{(dec-size.to(u.deg).value)}'
         points = client.query(myquery).get_points()
 
+        scanID_indx_list=[[0]*2]
+
         src_files=[]
         ref_files=[]
+        hot_files=[]
+
         # For loop over all of these pointings
         # POINTS contains a (time, scanID) for each pointing at (ra,dec)
         for point in points:
@@ -203,52 +232,94 @@ for ra in ra_indx:
                 if(int(unixtime) == int(nofrac_dt.timestamp())):  # Find spectra within 1 sec
                     src_files.extend(glob.glob(file)) # add spectra filename to array
 
-            # Find suitable reference files with equal or earlier scanID
-            # TODO: base on time and select earlier OR later reference scan
-            file_pattern = f'../GUSTO-DATA/spectra/ACS3_REF_{point.get("scanID")}_DEV4_INDX*'
+                    # Get scanIDs and INDX numbers of SRC files to limit REFs and HOTs
+                    scanID_indx_list.append([int(point.get('scanID')), int(file.split("_")[4][4:])])
+
+        # remove duplicates from scanID & INDX list
+        seen=set()
+        newlist=[]
+        for item in scanID_indx_list:
+            t = tuple(item)
+            if t not in seen:
+                newlist.append(item)
+                seen.add(t)
+        scanID_indx_list = newlist[1:]
+
+
+        # Find suitable calibration files
+        for scanID_indx in scanID_indx_list:
+            ID   = str(scanID_indx[0])
+            file_pattern = f'../GUSTO-DATA/spectra/ACS3_HOT_{ID}_DEV4_INDX*_'
+            search_files = glob.glob(file_pattern)
+            for file in search_files:
+                fp = open(file, 'r')
+                unixtime = fp.readline().split('\t')[1]
+                fp.close()
+                # look through these spectra for matching times
+                if(int(unixtime) < int(nofrac_dt.timestamp())):  # Find spectra within 1 sec
+                    hot_files.extend(glob.glob(file)) # add spectra filename to array
+
+
+        # Find suitable reference files with + or -1 OTF scanID
+        # TODO: base on time and select earlier OR later reference scan
+        for scanID_indx in scanID_indx_list:
+            ID   = str(scanID_indx[0])
+            file_pattern = f'../GUSTO-DATA/spectra/ACS3_REF_{ID}_DEV4_INDX*'
             search_files = glob.glob(file_pattern)
 
-            last=0
+            prev=-1
             while not ref_files:
                 for file in search_files:
                     if( os.path.isfile(file) ):
                         ref_files.extend(glob.glob(file))
-                file_pattern = f'../GUSTO-DATA/spectra/ACS3_REF_{str(int(point.get("scanID"))-last)}_DEV4_INDX*'
+                curID = str(int(point.get("scanID"))+prev)
+                file_pattern = f'../GUSTO-DATA/spectra/ACS3_REF_{curID}_DEV4_INDX*'
                 search_files = glob.glob(file_pattern)
-                last-=1
+                prev+=2
 
-        # Before we leave, get a current-ish CAL temperature
-        # TODO: pass this temp along to the plot T-A-star
-        scans = f''
-        scanID = int(point.get("scanID"))
-        for i in range(1,6):
-           if(i!=5): scans = scans+'{:d}|'.format(scanID-2)
-           if(i==5): scans = scans+'{:d}'.format(scanID-2)
-           scanID+=1
-        myquery = 'SELECT last(*) FROM "HK_TEMP11" WHERE "scanID"=~/({:s})/'.format(scans)
-        points = client.query(myquery).get_points()
-        for point in points:
-            T_CAL = point.get('last_temp')
-        print(T_CAL)
-        print("Cal temp is {:f}".format(T_CAL))
+        #print("waiting:")
+        #time.sleep(3)
 
         if not src_files or not ref_files:
             print("no files")
             exit
         else:
             srcx, srcy = read_and_average_files(src_files, n_lines_header=25)   # Average SRC
-       
+           
             for srcf in src_files:
                 print(srcf)
             for reff in ref_files:
                 print(reff)
-
+    
             refx, refy = read_and_average_files(ref_files, n_lines_header=25)   # Average REF
-
+    
             subtraction_ratio = (srcy - refy ) / refy
             spec = subtraction_ratio - np.mean(subtraction_ratio[185:267])
-            plot_subtraction_ratio(srcx, spec, (-30, 30), (-1, 3))
 
+
+            # combine src, hot, and ref from multiple scanIDs and plot
+            plot_subtraction_ratio(srcx, spec, (-30, 30), (-1, 5))
+
+plt.contour(integrated_intensity)
+plt.savefig('NGC6334-contour.png')
+#plt.show()
+
+
+
+# Before we leave, get a current-ish CAL temperature
+# TODO: pass this temp along to the plot T-A-star
+#scans = f''
+#scanID = int(point.get("scanID"))
+#for i in range(1,6):
+#    if(i!=5): scans = scans+'{:d}|'.format(scanID-2)
+#    if(i==5): scans = scans+'{:d}'.format(scanID-2)
+#    scanID+=1
+#myquery = 'SELECT last(*) FROM "HK_TEMP11" WHERE "scanID"=~/({:s})/'.format(scans)
+#points = client.query(myquery).get_points()
+#for point in points:
+#    T_CAL = point.get('last_temp')
+#print(T_CAL)
+#print("Cal temp is {:f}".format(T_CAL))
   
 
 # Use influxdb_client for V2.0 (with V1.8 compatibility)
