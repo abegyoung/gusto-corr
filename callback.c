@@ -315,13 +315,21 @@ void const callback(char *filein){
          fread(&value, 4, 1, fp);
          corr.QQ[i] = value;
       }
+
+      //per ACS documentation:
+      // corr.QI[0]=0;
+      // QI=circshift(QI,-1)
+      for(int i=0; i<(N-1); i++){
+       corr.QI[i]=corr.QI[i+1];
+      }
+      corr.QI[N-1]=0; // since QI[0]=0 and was circshifted to the end
    
       // Combine IQ lags into R[]
-         for(int i=0; i<(2*N)-1; i++){
+         for(int i=0; i<(2*N); i++){
             if(i%2 == 0) Rn[i] = corr.II[i/2] + corr.QQ[i/2];
             if(i%2 == 1) Rn[i] = corr.IQ[(i-1)/2] + corr.QI[1+(i-1)/2];
          }
-         Rn[(2*N)-1] = corr.IQ[(N-1)/2] + corr.QI[(N-1)/2];
+         // Rn[(2*N)-1] = corr.IQ[(N-1)/2] + corr.QI[(N-1)/2];
    
       // Mirror R[] symmetrically
          for(int i=0; i<4*N; i++){
