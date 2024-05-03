@@ -1,4 +1,4 @@
-#*Tutorial #1
+# Tutorial #1
 example of calling a windows DLL.
 
 A bubblesort algorithm is coded in ANSI C under Windows 10 using mingw 64 bit gcc and a DLL is made.
