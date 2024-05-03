@@ -90,6 +90,7 @@ void const callback(char *filein){
    int N;
    FILE *fp;
    FILE *fout;
+   FILE *fout_lag;
    FILE *errf;
    double P_I;
    double P_Q;
@@ -285,6 +286,10 @@ void const callback(char *filein){
                                                UNIT-1, prefix, scanID, DEV, dataN, j);
       fout = fopen(fileout, "w");
 
+      sprintf(fileout, "spectra/ACS%d_%s_%05d_DEV%d_INDX%04d_NINT%03d.lag", \
+                                               UNIT-1, prefix, scanID, DEV, dataN, j);
+      fout_lag = fopen(fileout, "w");
+
       //read human readable "Number of Lags"
       if (NBYTES==8256)
         N = 512;
@@ -297,10 +302,10 @@ void const callback(char *filein){
       int specA = (int) N/128 - 1;
 
       //We don't know the lag # until we open the file, so malloc now
-      corr.QI   = malloc(N*sizeof(int32_t));
       corr.II   = malloc(N*sizeof(int32_t));
-      corr.QQ   = malloc(N*sizeof(int32_t));
+      corr.QI   = malloc(N*sizeof(int32_t));
       corr.IQ   = malloc(N*sizeof(int32_t));
+      corr.QQ   = malloc(N*sizeof(int32_t));
       Rn  = malloc(2*N*sizeof(int32_t));
       Rn2 = malloc(4*N*sizeof(int32_t));
 
@@ -399,10 +404,18 @@ void const callback(char *filein){
    
       fclose(fout); //close single spectra file
 
-      free(corr.QI);    //free all mallocs
-      free(corr.II);
-      free(corr.QQ);
+
+      // Output lags
+      for(int i=0; i<N; i++){
+         fprintf(fout_lag, "%d\t%d\t%d\t%d\t%d\n", i, corr.II[i],corr.QI[i],corr.IQ[i],corr.QQ[i]);
+      }
+
+      fclose(fout_lag); //close single spectra file
+
+      free(corr.II);    //free all mallocs
+      free(corr.QI);
       free(corr.IQ);
+      free(corr.QQ);
       free(Rn);
       free(Rn2);
 
