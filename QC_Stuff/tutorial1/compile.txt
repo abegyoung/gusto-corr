@@ -1,0 +1,2 @@
+i686-w64-mingw32-gcc -o demo.obj -c -O2 -mms-bitfields demo.c
+i686-w64-mingw32-gcc -o demo.dll -shared demo.obj
