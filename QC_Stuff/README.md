@@ -36,7 +36,7 @@ pip install zugbruecke
 Install winehq-stable and wine-stable-64 using apt from winehq.org
 
 # Tutorial 2
-Now we will call the Python zugbruecke ctypes library from a compiled c program.  This is a step closer to getting QuantCorrDLL64.dll into corrspec.
+Now we will call a Python function from a compiled c program.  This is a step closer to getting QuantCorrDLL64.dll into corrspec.
 
 The python function is simple, takes two numbers ```a, b``` and returns the addition.
 
