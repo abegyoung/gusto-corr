@@ -8,6 +8,8 @@
 #include <curl/curl.h>
 #include "influx.h"
 
+#include <Python.h>
+
 #define PI 3.14159
 #define BUFSIZE 128
 
@@ -347,6 +349,16 @@ void const callback(char *filein){
                                                 (erfinv(1-2*(double)corr.Ilo/(double)corr.corrtime)),2);
         P_Q = pow((VQhi-VQlo),2) * 1.8197 / pow((erfinv(1-2*(double)corr.Qhi/(double)corr.corrtime)) + \
                                                 (erfinv(1-2*(double)corr.Qlo/(double)corr.corrtime)),2);
+
+
+     // Get alternative power calibration from DLL
+        PyTuple_SetItem(pArgs, 0, PyFloat_FromDouble(corr.Ilo));
+        PyTuple_SetItem(pArgs, 1, PyFloat_FromDouble(corr.Ihi));
+        PyTuple_SetItem(pArgs, 2, PyFloat_FromDouble(corr.corrtime));
+        double Ipwr = PyFloat_AsDouble(pValue);
+
+        printf("Ipwr is %f\n", Ipwr);
+
 
     // Header information in spectra file
       //fprintf(fout, "DATAFILE\t%s\n", filein_name);

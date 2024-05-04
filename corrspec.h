@@ -1,6 +1,7 @@
 #include <math.h>
 #include <it/math.h>
 #include <fftw3.h>
+#include <Python.h>
 
 
 // Make 4 structs for 128,256,384,512 FFT array lengths
@@ -11,4 +12,8 @@ struct Spectrum
 };
 
 extern struct Spectrum spec[4];
+
+extern PyObject *pName, *pModule, *pFunc;
+extern PyObject *pArgs, *pValue;
+
 

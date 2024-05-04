@@ -14,12 +14,12 @@ ifeq ($(FSFLAG), 2)
 endif
 
 ifeq ($(KERNEL), Linux)
-      INCLUDES := -I/usr/local/include -I/usr/pkg/include -I./
-      LIBS := -Wl,-rpath,/usr/local/lib -lit -L/usr/pkg/lib -L/usr/local/lib -lm -lfftw3 -lcurl
+      INCLUDES := -I/usr/local/include -I/usr/pkg/include -I./ -I/usr/include/python3.10
+      LIBS := -Wl,-rpath,/usr/local/lib -lit -L/usr/pkg/lib -L/usr/local/lib -lm -lfftw3 -lcurl -lpython3.10
 
 else ifeq ($(KERNEL), Darwin)
-      INCLUDES := -I/opt/local/include -I/opt/local/include -I./
-      LIBS := -Wl,-rpath,/opt/local/lib -lit -L/opt/local/lib -lm -lfftw3 -lfswatch -lcurl
+      INCLUDES := -I/opt/local/include -I/opt/local/include -I./ -I/usr/include/python3.10
+      LIBS := -Wl,-rpath,/opt/local/lib -lit -L/opt/local/lib -lm -lfftw3 -lfswatch -lcurl -lpython3.10
 
 else
       $(error unknown kernel)

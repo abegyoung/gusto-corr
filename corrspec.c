@@ -12,12 +12,24 @@
 #include "corrspec.h"
 #include "callback.h"
 #include <glob.h>
+#include <Python.h>
 
 
 struct Spectrum spec[4];
 
 int main(int argc, char **argv) {
 
+   // Initialize the PYthon interpreter
+   Py_Initialize();
+
+   // Build the name object
+   pName = PyUnicode_FromString("callQc.py");
+
+   // Load the module object
+   pModule = PyImport_Import(pName);
+
+   // Get the function from the module
+   pFunc = PyObject_GetAttrString(pModule, "relpower");
    
    void *data;
 
