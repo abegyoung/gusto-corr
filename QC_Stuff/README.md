@@ -16,6 +16,11 @@ i686-w64-mingw32-gcc -o demo.obj -c -O2 -mms-bitfields demo.c
 i686-w64-mingw32-gcc -o demo.dll -shared demo.obj
 ```
 
+The library function takes three arguments.  First arugment is a pointer to an a C array of type double of unsorted values, the second the size of the input array as a C integer, and the third is a pointer to a C array of type double which will hold the newly sorted values.
+
+This function call mirrors how the Omnisys Quantization Correction function works.
+
+Make sure zugbruecke is in your Python library, and that demo.dll is in the current directory.
 
 # Tutorial 2
 ### Call a python function from a compiled c program.
@@ -47,16 +52,8 @@ Put the first two tutorials together to call the QuantCorrDLL from a c program t
 Python script to read spectra and lag files from corrspec through the quantiztion correction process.
 
 ## Appendicies
-### Call program
-```
-python3 call.py
 ```
 
-The library function takes three arguments.  First arugment is a pointer to an a C array of type double of unsorted values, the second the size of the input array as a C integer, and the third is a pointer to a C array of type double which will hold the newly sorted values.
-
-This function call mirrors how the Omnisys Quantization Correction function works.
-
-Make sure zugbruecke is in your Python library, and that demo.dll is in the current directory.
 
 ### Zugbruecke
 ```
