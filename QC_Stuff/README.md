@@ -1,5 +1,5 @@
 # Tutorial #1
-example of calling a windows DLL.
+### An example of calling a windows DLL from a Python script using [zugbruecke](https://zugbruecke.readthedocs.io/en/latest/).
 
 A bubblesort algorithm is coded in ANSI C under Windows 10 using mingw 64 bit gcc and a DLL is made.
 
@@ -16,26 +16,10 @@ i686-w64-mingw32-gcc -o demo.obj -c -O2 -mms-bitfields demo.c
 i686-w64-mingw32-gcc -o demo.dll -shared demo.obj
 ```
 
-## Call program
-```
-python3 call.py
-```
-
-The library function takes three arguments.  First arugment is a pointer to an a C array of type double of unsorted values, the second the size of the input array as a C integer, and the third is a pointer to a C array of type double which will hold the newly sorted values.
-
-This function call mirrors how the Omnisys Quantization Correction function works.
-
-Make sure zugbruecke is in your Python library, and that demo.dll is in the current directory.
-
-## Zugbruecke
-```
-pip install zugbruecke
-```
-
-## Wine
-Install winehq-stable and wine-stable-64 using apt from winehq.org
 
 # Tutorial 2
+### Call a python function from a compiled c program.
+
 Now we will call a Python function from a compiled c program.  This is a step closer to getting QuantCorrDLL64.dll into corrspec.
 
 The python function is simple, takes two numbers ```a, b``` and returns the addition.
@@ -52,3 +36,32 @@ Sent: 7 and 1
 Result of call: 8
 ```
 
+# Tutorial 3
+### Call QuantCorrDLL64.dll from a c program
+Put the first two tutorials together to call the QuantCorrDLL from a c program through a python function definition
+
+
+# Tutorial 4
+### Process GUSTO lag files through quantization correction.
+
+Python script to read spectra and lag files from corrspec through the quantiztion correction process.
+
+## Appendicies
+### Call program
+```
+python3 call.py
+```
+
+The library function takes three arguments.  First arugment is a pointer to an a C array of type double of unsorted values, the second the size of the input array as a C integer, and the third is a pointer to a C array of type double which will hold the newly sorted values.
+
+This function call mirrors how the Omnisys Quantization Correction function works.
+
+Make sure zugbruecke is in your Python library, and that demo.dll is in the current directory.
+
+### Zugbruecke
+```
+pip install zugbruecke
+```
+
+### Wine
+Install winehq-stable and wine-stable-64 using apt from winehq.org
