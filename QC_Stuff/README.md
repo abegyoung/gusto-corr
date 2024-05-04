@@ -20,7 +20,7 @@ The library function takes three arguments.  First arugment is a pointer to an a
 
 This function call mirrors how the Omnisys Quantization Correction function works.
 
-Make sure zugbruecke is in your Python library, and that demo.dll is in the current directory.
+Make sure the zugbruecke library is availble and that demo.dll is in the current directory.
 
 # Tutorial 2
 ### Call a python function from a compiled c program.
