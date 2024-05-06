@@ -79,8 +79,23 @@ void const callback(char *filein){
    char errfile[64] = "err.log";
 
    // Python call
+   PyObject *pName, *pModule, *pFunc;
    PyObject *pArgs, *pValue;
 
+   // Initialize the PYthon interpreter
+   Py_Initialize();
+
+   // Build the name object
+   pName = PyUnicode_FromString("callQC");
+
+   // Load the module object
+   pModule = PyImport_Import(pName);
+
+   // Get the function from the module
+   if (pModule != NULL)
+      pFunc = PyObject_GetAttrString(pModule, "relpower");
+
+   pArgs = PyTuple_New(2);
 
    // InfluxDB easy_curl objects
    CURL *curl;
@@ -355,13 +370,12 @@ void const callback(char *filein){
                                                 (erfinv(1-2*(double)corr.Qlo/(double)corr.corrtime)),2);
 
 
-     // Get alternative power calibration from DLL
-        PyTuple_SetItem(pArgs, 0, PyFloat_FromDouble(corr.Ilo));
-        PyTuple_SetItem(pArgs, 1, PyFloat_FromDouble(corr.Ihi));
-        PyTuple_SetItem(pArgs, 2, PyFloat_FromDouble(corr.corrtime));
-        double Ipwr = PyFloat_AsDouble(pValue);
-
-        printf("Ipwr is %f\n", Ipwr);
+     // Get alternative power calibration from Omnisys DLL
+      PyTuple_SetItem(pArgs, 0, PyFloat_FromDouble((double)corr.Ilo/corr.corrtime));
+      PyTuple_SetItem(pArgs, 1, PyFloat_FromDouble((double)corr.Ihi/corr.corrtime));
+      pValue = PyObject_CallObject(pFunc, pArgs);
+      double Ipwr = PyFloat_AsDouble(pValue);
+      printf("Ipwr is %f\n", Ipwr);
 
 
     // Header information in spectra file

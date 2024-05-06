@@ -18,22 +18,9 @@
 struct Spectrum spec[4];
 
 int main(int argc, char **argv) {
-   // 
-   PyObject *pName, *pModule, *pFunc;
-   PyObject *pArgs, *pValue;
 
-   // Initialize the PYthon interpreter
-   Py_Initialize();
+   putenv("PYTHONPATH=./");
 
-   // Build the name object
-   pName = PyUnicode_FromString("callQc.py");
-
-   // Load the module object
-   pModule = PyImport_Import(pName);
-
-   // Get the function from the module
-   pFunc = PyObject_GetAttrString(pModule, "relpower");
-   
    void *data;
 
    printf("readying fft\n");

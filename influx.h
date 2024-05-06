@@ -6,7 +6,6 @@
 
 
 // global variable to be returned by worker from callback fn
-//extern double influx_return;
 
 // struct for the influxDB worker to return
 struct influxStruct
