@@ -8,6 +8,8 @@ int main() {
 	double corrtime = 0.33*5000*1e6/256;
 	double result;
 
+	putenv("PYTHONPATH=./");
+
 	// Initialize the Python interpreter
 	Py_Initialize();
 
@@ -40,6 +42,7 @@ int main() {
 			if (pValue != NULL) {
 				result = PyFloat_AsDouble(pValue);
 				printf("Result of call: %f\n", result);
+				printf("called with: %f\t%f\n", input1, input2);
 				Py_DECREF(pValue);
 			} else {
 				PyErr_Print();
