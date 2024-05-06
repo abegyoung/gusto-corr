@@ -18,6 +18,9 @@
 struct Spectrum spec[4];
 
 int main(int argc, char **argv) {
+   // 
+   PyObject *pName, *pModule, *pFunc;
+   PyObject *pArgs, *pValue;
 
    // Initialize the PYthon interpreter
    Py_Initialize();

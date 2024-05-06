@@ -78,6 +78,10 @@ void const callback(char *filein){
 
    char errfile[64] = "err.log";
 
+   // Python call
+   PyObject *pArgs, *pValue;
+
+
    // InfluxDB easy_curl objects
    CURL *curl;
    CURLcode res;
