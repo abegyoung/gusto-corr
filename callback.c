@@ -78,24 +78,37 @@ void const callback(char *filein){
 
    char errfile[64] = "err.log";
 
-   // Python call
-   PyObject *pName, *pModule, *pFunc;
-   PyObject *pArgs, *pValue;
+   // Python variables
+   // pFunc1 == relpower(), pFunc2 == qc()
+   // pArgs2 == relpower() args, pArgs2 == qc() args
+   // pListXY = correlation coeff Python List
+   // pValue == returns
+   PyObject *pName, *pModule, *pFunc1, *pFunc2;
+   PyObject *pArgs1, *pArgs2, *pValue;
+   PyObject *pListII, *pListQI, *pListIQ, *pListQQ; 
+   PyObject *pValueII, *pValueQI, *pValueIQ, *pValueQQ; 
 
-   // Initialize the PYthon interpreter
+   // Initialize the Python interpreter
    Py_Initialize();
 
-   // Build the name object
+   // Build the name object for both functions from callQC.py file
    pName = PyUnicode_FromString("callQC");
 
    // Load the module object
    pModule = PyImport_Import(pName);
 
-   // Get the function from the module
-   if (pModule != NULL)
-      pFunc = PyObject_GetAttrString(pModule, "relpower");
+   // Get the two functions from the module
+   if (pModule != NULL){
+      pFunc1 = PyObject_GetAttrString(pModule, "relpower");
+      pFunc2 = PyObject_GetAttrString(pModule, "qc");
+   }
 
-   pArgs = PyTuple_New(2);
+   // Arguments to relpower(XmonL, XmonH)
+   pArgs1 = PyTuple_New(2); // for relpower(XmonL, XmonH)
+   pArgs2 = PyTuple_New(5); // for       qc(XmonL, XmonH, YmonL, YmonH, corr.XY)
+
+   // End Python initilization
+
 
    // InfluxDB easy_curl objects
    CURL *curl;
@@ -111,10 +124,11 @@ void const callback(char *filein){
    int N;
    FILE *fp;
    FILE *fout;
-   FILE *fout_lag;
    FILE *errf;
    double P_I;
    double P_Q;
+   double Ipwr;
+   double Qpwr;
    struct corrType corr;
 
    uint64_t UNIXTIME;
@@ -307,10 +321,6 @@ void const callback(char *filein){
                                                UNIT-1, prefix, scanID, DEV, dataN, j);
       fout = fopen(fileout, "w");
 
-      sprintf(fileout, "spectra/ACS%d_%s_%05d_DEV%d_INDX%04d_NINT%03d.lag", \
-                                               UNIT-1, prefix, scanID, DEV, dataN, j);
-      fout_lag = fopen(fileout, "w");
-
       //read human readable "Number of Lags"
       if (NBYTES==8256)
         N = 512;
@@ -341,7 +351,84 @@ void const callback(char *filein){
          fread(&value, 4, 1, fp);
          corr.QQ[i] = value;
       }
+
+
+      // PASS THE UNCORRECTED LAGS INTO PYTHON FOR QUANTIZATION CORRECTION HERE !!!
+      // 
+      // create a Python list and fill it with uncorrected correlation coefficients
+      // Check for errors
+      if (pModule != NULL) {
+         // Get the function from the module
+         pFunc2 = PyObject_GetAttrString(pModule, "qc");
+
+         if (pFunc2 && PyCallable_Check(pFunc2)) {
+            // For first four arguments: XmonL, XmonH, YmonL, YmonH
+	    PyTuple_SetItem(pArgs2, 0, PyFloat_FromDouble((double)corr.Ilo/(double)corr.corrtime));
+	    PyTuple_SetItem(pArgs2, 1, PyFloat_FromDouble((double)corr.Ihi/(double)corr.corrtime));
+	    PyTuple_SetItem(pArgs2, 2, PyFloat_FromDouble((double)corr.Ilo/(double)corr.corrtime));
+	    PyTuple_SetItem(pArgs2, 3, PyFloat_FromDouble((double)corr.Ihi/(double)corr.corrtime));
+
+            // For fifth argument: convert C array to a Python List
+            pListII = PyList_New(N);
+	   
+            for (int i=0; i<N; ++i){
+               PyList_SetItem(pListII, i, PyFloat_FromDouble((double)corr.II[i]/(double)corr.corrtime));
+            }
+	    PyTuple_SetItem(pArgs2, 4, pListII);
+
+
+	    // DEBUG print uncorrected
+	    printf("XY   ");
+            for (int i=0; i<10; ++i)
+               printf("%d ", corr.II[i]);
+	    printf("\n");
+
    
+            // Call the function
+            pValueII = PyObject_CallObject(pFunc2, pArgs2);
+   
+            // Check for errors
+            if (pValueII != NULL) {
+               // Extract the values from the returned list
+               for (int i=0; i<N; ++i){
+                  corr.II[i] = (int32_t) (0.5 * corr.corrtime * PyFloat_AsDouble(PyList_GetItem(pValueII, i)));
+               }
+	       Py_DECREF(pValueII);
+            } else{
+	       PyErr_Print();
+	    }
+
+
+	    // DEBUG print corrected
+	    printf("XYqc ");
+            for (int i=0; i<10; ++i)
+               printf("%d ", corr.II[i]);
+	    printf("\n");
+	    printf("\n");
+
+
+	    // Clean Up
+	    //Py_DECREF(pListII); // Need these next loop, only created at start of callback()
+         } else {
+	    if (PyErr_Occurred()) {
+	       PyErr_Print();
+	       fprintf(stderr, "Cannot find function\n");
+	    }
+	 }
+	 //Py_XDECREF(pFunc2); // Need these next loop, only created at start of callback()
+	 //Py_DECREF(pModule);
+      } else {
+	 PyErr_Print();
+	 fprintf(stderr, "Failed to load the Python module\n");
+      }
+
+
+
+
+
+      // GET THE QUANTIZATION CORRECTED LAGS BACK AND USE BELOW !!!
+   
+
       // Combine IQ lags into R[]
          for(int i=0; i<(2*N)-1; i++){
             if(i%2 == 0) Rn[i] = corr.II[i/2] + corr.QQ[i/2];
@@ -361,7 +448,7 @@ void const callback(char *filein){
            spec[specA].in[i][1] = 0.;                                       //imag
          }
    
-     // Do FFT and print
+      // Do FFT and print
         fftw_execute(spec[specA].p);
 
         P_I = pow((VIhi-VIlo),2) * 1.8197 / pow((erfinv(1-2*(double)corr.Ihi/(double)corr.corrtime)) + \
@@ -369,17 +456,25 @@ void const callback(char *filein){
         P_Q = pow((VQhi-VQlo),2) * 1.8197 / pow((erfinv(1-2*(double)corr.Qhi/(double)corr.corrtime)) + \
                                                 (erfinv(1-2*(double)corr.Qlo/(double)corr.corrtime)),2);
 
+      // GET ALTERNATIVE POWER CALIBRATION FROM OMNISYS DLL
+      // P_I,  P_Q calculated from the inverse error function using (Ihi, Ilow) is equal
+      // to the relpower function from the Omnisys DLL to high precision. When  validated
+      // over a range of power levels (HOT, OTF, REF) the two give equal results up to a
+      // factor of 2.   (The factor 1.8197 likely comes from the erfinv for a 3-level ACS
+      PyTuple_SetItem(pArgs1, 0, PyFloat_FromDouble((double)corr.Ilo/corr.corrtime));
+      PyTuple_SetItem(pArgs1, 1, PyFloat_FromDouble((double)corr.Ihi/corr.corrtime));
+      pValue = PyObject_CallObject(pFunc1, pArgs1);
+      Ipwr = 2. * pow((VIhi-VIlo),2) * PyFloat_AsDouble(pValue);
 
-     // Get alternative power calibration from Omnisys DLL
-      PyTuple_SetItem(pArgs, 0, PyFloat_FromDouble((double)corr.Ilo/corr.corrtime));
-      PyTuple_SetItem(pArgs, 1, PyFloat_FromDouble((double)corr.Ihi/corr.corrtime));
-      pValue = PyObject_CallObject(pFunc, pArgs);
-      double Ipwr = PyFloat_AsDouble(pValue);
-      printf("Ipwr is %f\n", Ipwr);
+      PyTuple_SetItem(pArgs1, 0, PyFloat_FromDouble((double)corr.Qlo/corr.corrtime));
+      PyTuple_SetItem(pArgs1, 1, PyFloat_FromDouble((double)corr.Qhi/corr.corrtime));
+      pValue = PyObject_CallObject(pFunc1, pArgs1);
+      Qpwr = 2. * pow((VQhi-VQlo),2) * PyFloat_AsDouble(pValue);
 
+      // Output the relative power comparison
+      printf("Ipwr is %f\tQpwr is %f\tP_I is %f\tP_Q is %f\n", Ipwr, Qpwr, P_I, P_Q);
 
-    // Header information in spectra file
-      //fprintf(fout, "DATAFILE\t%s\n", filein_name);
+      // Header information in spectra file
       fprintf(fout, "UNIXTIME\t%" PRIu64 "\n", UNIXTIME);
       fprintf(fout, "CORRTIME\t%.6f\n", (corr.corrtime*256.)/(5000.*1000000.));
       fprintf(fout, "UNIT\t%d\n", UNIT);
@@ -427,20 +522,10 @@ void const callback(char *filein){
    
       //Print in counts per second (assuming 5000 MHz sampling freq)
       for(int i=0; i<2*N; i++){
-         fprintf(fout, "%d\t%lf\n", (5000*i)/(2*N), \
-                                      (5000.*1000000.)/(corr.corrtime*256.)*sqrt(P_I*P_Q)* \
-                                      sqrt(fabs(spec[specA].out[i][0]*(-1*spec[specA].out[i][1]))) );
+         fprintf(fout, "%d\t%lf\n", (5000*i)/(2*N), (5000.*1e6)/(corr.corrtime*256.) * sqrt(P_I*P_Q) * sqrt(fabs(spec[specA].out[i][0]*(-1*spec[specA].out[i][1]))));
+         fprintf(fout, "%d\t%lf\n", (5000*i)/(2*N), (5000.*1e6)/(corr.corrtime*256.) * sqrt(P_I*P_Q) * sqrt(fabs(spec[specA].out[i][0]*(-1*spec[specA].out[i][1]))));
       }
-   
       fclose(fout); //close single spectra file
-
-
-      // Output lags
-      for(int i=0; i<N; i++){
-         fprintf(fout_lag, "%d\t%d\t%d\t%d\t%d\n", i, corr.II[i],corr.QI[i],corr.IQ[i],corr.QQ[i]);
-      }
-
-      fclose(fout_lag); //close single spectra file
 
       free(corr.II);    //free all mallocs
       free(corr.QI);
@@ -468,7 +553,8 @@ void const callback(char *filein){
                                        (double)corr.Ilo/(double)corr.corrtime, \
                                        (double)corr.Qlo/(double)corr.corrtime);
       printf("nlags=%d\n", N);
-      printf("etaQ %.3f\n\n", 1/sqrt(P_I*P_Q));
+      printf("etaQ\t%.3f\n", 1/sqrt(P_I*P_Q));
+      printf("ETAQ\t%.3f\n\n", 1/sqrt(Ipwr*Qpwr));
 
       // current scanID, and scanID used for cal
       printf("The cal  is from scanID: %d\n", influxReturn.scanID);

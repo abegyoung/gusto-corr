@@ -2,7 +2,7 @@
 
 int main() {
     PyObject *pName, *pModule, *pFunc;
-    PyObject *pList, *pValue;
+    PyObject *pArgs, *pList, *pValue;
     double input_values[] = {1.0, 2.0, 3.0, 4.0, 5.0};
     int num_values = sizeof(input_values) / sizeof(input_values[0]);
 
@@ -23,14 +23,23 @@ int main() {
         pFunc = PyObject_GetAttrString(pModule, "increment_values");
 
         if (pFunc && PyCallable_Check(pFunc)) {
-            // Convert C array to a Python List
+            pArgs = PyTuple_New(2);
+
+
+
+
+            // For first argument, convert C array to a Python List
             pList = PyList_New(num_values);
             for (int i=0; i<num_values; ++i){
                 PyList_SetItem(pList, i, PyFloat_FromDouble(input_values[i]));
             }
+	    PyTuple_SetItem(pArgs, 0, pList);
+
+	    // Second argument: number of elements
+	    PyTuple_SetItem(pArgs, 1, PyLong_FromLong(num_values));
 
             // Call the function
-            pValue = PyObject_CallFunctionObjArgs(pFunc, pList, NULL);
+            pValue = PyObject_CallObject(pFunc, pArgs);
 
             // Check for errors
             if (pValue != NULL) {

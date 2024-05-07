@@ -8,10 +8,10 @@ ctypes = CtypesSession(arch = 'win64')
 dll = ctypes.windll.LoadLibrary('QuantCorrDLL64.dll')
 _qc = dll.qc
 _qc.argtypes = (
-           ctypes.c_double, # ImonL
-           ctypes.c_double, # ImonH
-           ctypes.c_double, # QmonL
-           ctypes.c_double, # QmonH
+           ctypes.c_double, # XmonL
+           ctypes.c_double, # XmonH
+           ctypes.c_double, # YmonL
+           ctypes.c_double, # YmonH
            ctypes.POINTER(ctypes.c_double),  # XYin
            ctypes.c_int,                     # nElem
            ctypes.POINTER(ctypes.c_double))  # XYqc
@@ -37,7 +37,15 @@ def relpower(monL, monH):
 
     return  _relpower(monL, monH)
 
-def qc(XmonL, XmonH, YmonL, YmonH, XYin, nElem, XYout):
+def qc(XmonL, XmonH, YmonL, YmonH, XY):
 
-    return _qc(XmonL, XmonH, YmonL, YmonH, XYin, nElem, XYout)
+    nElem = len(XY)
+    XYin  = (ctypes.c_double * nElem)()
+    XYout = (ctypes.c_double * nElem)()
+    for i in range(0,nElem):
+        XYin[i] = XY[i]
+
+    _qc(XmonL, XmonH, YmonL, YmonH, XYin, nElem, XYout)
+
+    return [value for value in XYout]
 

@@ -4,3 +4,4 @@ corrspec
 *.log
 .*.swp
 prog
+**/*/*/__pycache__/
