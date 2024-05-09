@@ -16,10 +16,34 @@
 
 
 struct Spectrum spec[4];
+PyObject *pName, *pModule;
+PyObject *pFunc1, *pFunc2;
 
 int main(int argc, char **argv) {
 
+   // Set up the Python C Extensions here (Used in callback() function in callback.c
    putenv("PYTHONPATH=./");
+
+   // Initialize the Python interpreter
+   Py_Initialize();
+
+   // common to both functions
+
+   // Build the name object for both functions from callQC.py file
+   pName = PyUnicode_FromString("callQC");
+
+   // Load the module object
+   pModule = PyImport_Import(pName);
+
+   // Get the two functions from the module
+   if (pModule != NULL){
+      pFunc1 = PyObject_GetAttrString(pModule, "relpower");
+      pFunc2 = PyObject_GetAttrString(pModule, "qc");
+   } else {
+	   PyErr_Print();
+	   fprintf(stderr, "Failed to load the Python module in main()\n");
+   }
+
 
    void *data;
 
@@ -112,6 +136,14 @@ int main(int argc, char **argv) {
    }
 
 #endif
+
+   // Clean up Python calls
+Py_DECREF(pFunc1);
+Py_DECREF(pFunc2);
+
+Py_DECREF(pModule);
+Py_DECREF(pName);
+Py_Finalize();
 
    return 0;
 }

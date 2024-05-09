@@ -12,6 +12,7 @@
 
 #define PI 3.14159
 #define BUFSIZE 128
+#define DEBUG 1
 
 
 void printDateTimeFromEpoch(time_t ts){
@@ -78,34 +79,46 @@ void const callback(char *filein){
 
    char errfile[64] = "err.log";
 
-   // Python variables
-   // pFunc1 == relpower(), pFunc2 == qc()
-   // pArgs2 == relpower() args, pArgs2 == qc() args
-   // pListXY = correlation coeff Python List
-   // pValue == returns
-   PyObject *pName, *pModule, *pFunc1, *pFunc2;
-   PyObject *pArgs1, *pArgs2, *pValue;
+   // moved to main()
+   // Initialize the Python interpreter
+   //Py_Initialize();
+
+   // moved to main()
+   // common to both functions
+   //PyObject *pName, *pModule;
+   
+   // for relpower
+   //PyObject *pFunc1;
+   PyObject *pArgs1, *pValue;
+
+   // for qc
+   //PyObject *pFunc2;
+   PyObject *pArgsII, *pArgsQI, *pArgsIQ, *pArgsQQ; 
    PyObject *pListII, *pListQI, *pListIQ, *pListQQ; 
    PyObject *pValueII, *pValueQI, *pValueIQ, *pValueQQ; 
 
-   // Initialize the Python interpreter
-   Py_Initialize();
-
+   // moved to main()
    // Build the name object for both functions from callQC.py file
-   pName = PyUnicode_FromString("callQC");
+   //pName = PyUnicode_FromString("callQC");
 
+   // moved to main()
    // Load the module object
-   pModule = PyImport_Import(pName);
+   //pModule = PyImport_Import(pName);
 
+   // moved to main()
    // Get the two functions from the module
-   if (pModule != NULL){
-      pFunc1 = PyObject_GetAttrString(pModule, "relpower");
-      pFunc2 = PyObject_GetAttrString(pModule, "qc");
-   }
+   //if (pModule != NULL){
+   //   pFunc1 = PyObject_GetAttrString(pModule, "relpower");
+   //   pFunc2 = PyObject_GetAttrString(pModule, "qc");
+   //}
+
 
    // Arguments to relpower(XmonL, XmonH)
    pArgs1 = PyTuple_New(2); // for relpower(XmonL, XmonH)
-   pArgs2 = PyTuple_New(5); // for       qc(XmonL, XmonH, YmonL, YmonH, corr.XY)
+   pArgsII = PyTuple_New(5); // for       qc(ImonL, ImonH, ImonL, ImonH, corr.II)
+   pArgsIQ = PyTuple_New(5); // for       qc(ImonL, ImonH, QmonL, QmonH, corr.IQ)
+   pArgsQI = PyTuple_New(5); // for       qc(QmonL, QmonH, ImonL, ImonH, corr.IQ)
+   pArgsQQ = PyTuple_New(5); // for       qc(QmonL, QmonH, QmonL, QmonH, corr.QQ)
 
    // End Python initilization
 
@@ -293,7 +306,8 @@ void const callback(char *filein){
       VQlo = dacV[3];
 
       // DEBUG
-      //printf("VIhi %.3f\tVQhi %.3f\tVIlo %.3f\tVQlo %.3f\n", VIhi, VQhi, VIlo, VQlo);
+      if (DEBUG)
+         printf("VIhi %.3f\tVQhi %.3f\tVIlo %.3f\tVQlo %.3f\n", VIhi, VQhi, VIlo, VQlo);
 
       // this section here unfuck-ifys special cases where ICE was off by one
       if (VQlo==0.){
@@ -305,7 +319,8 @@ void const callback(char *filein){
 
       
       // DEBUG
-      //printf("VIhi %.3f\tVQhi %.3f\tVIlo %.3f\tVQlo %.3f\n", VIhi, VQhi, VIlo, VQlo);
+      if (DEBUG)
+         printf("VIhi %.3f\tVQhi %.3f\tVIlo %.3f\tVQlo %.3f\n", VIhi, VQhi, VIlo, VQlo);
 
 
       if(VIhi==0.){ //Still no values?  break and don't make spectra
@@ -353,69 +368,111 @@ void const callback(char *filein){
       }
 
 
+
+
       // PASS THE UNCORRECTED LAGS INTO PYTHON FOR QUANTIZATION CORRECTION HERE !!!
-      // 
-      // create a Python list and fill it with uncorrected correlation coefficients
+       
+
+
+
+      // create a Python list and fill it with normalized uncorrected correlation coefficients
       // Check for errors
       if (pModule != NULL) {
          // Get the function from the module
-         pFunc2 = PyObject_GetAttrString(pModule, "qc");
+         //pFunc2 = PyObject_GetAttrString(pModule, "qc");
+printf("%d\n", PyCallable_Check(pFunc2));
+printf("here\n");
 
          if (pFunc2 && PyCallable_Check(pFunc2)) {
             // For first four arguments: XmonL, XmonH, YmonL, YmonH
-	    PyTuple_SetItem(pArgs2, 0, PyFloat_FromDouble((double)corr.Ilo/(double)corr.corrtime));
-	    PyTuple_SetItem(pArgs2, 1, PyFloat_FromDouble((double)corr.Ihi/(double)corr.corrtime));
-	    PyTuple_SetItem(pArgs2, 2, PyFloat_FromDouble((double)corr.Ilo/(double)corr.corrtime));
-	    PyTuple_SetItem(pArgs2, 3, PyFloat_FromDouble((double)corr.Ihi/(double)corr.corrtime));
+	    // II
+	    PyTuple_SetItem(pArgsII, 0, PyFloat_FromDouble((double)corr.Ilo/(double)corr.corrtime));
+	    PyTuple_SetItem(pArgsII, 1, PyFloat_FromDouble((double)corr.Ihi/(double)corr.corrtime));
+	    PyTuple_SetItem(pArgsII, 2, PyFloat_FromDouble((double)corr.Ilo/(double)corr.corrtime));
+	    PyTuple_SetItem(pArgsII, 3, PyFloat_FromDouble((double)corr.Ihi/(double)corr.corrtime));
+            // IQ
+	    PyTuple_SetItem(pArgsIQ, 0, PyFloat_FromDouble((double)corr.Ilo/(double)corr.corrtime));
+	    PyTuple_SetItem(pArgsIQ, 1, PyFloat_FromDouble((double)corr.Ihi/(double)corr.corrtime));
+	    PyTuple_SetItem(pArgsIQ, 2, PyFloat_FromDouble((double)corr.Qlo/(double)corr.corrtime));
+	    PyTuple_SetItem(pArgsIQ, 3, PyFloat_FromDouble((double)corr.Qhi/(double)corr.corrtime));
+            // QI
+	    PyTuple_SetItem(pArgsQI, 0, PyFloat_FromDouble((double)corr.Qlo/(double)corr.corrtime));
+	    PyTuple_SetItem(pArgsQI, 1, PyFloat_FromDouble((double)corr.Qhi/(double)corr.corrtime));
+	    PyTuple_SetItem(pArgsQI, 2, PyFloat_FromDouble((double)corr.Ilo/(double)corr.corrtime));
+	    PyTuple_SetItem(pArgsQI, 3, PyFloat_FromDouble((double)corr.Ihi/(double)corr.corrtime));
+            // QQ
+	    PyTuple_SetItem(pArgsQQ, 0, PyFloat_FromDouble((double)corr.Qlo/(double)corr.corrtime));
+	    PyTuple_SetItem(pArgsQQ, 1, PyFloat_FromDouble((double)corr.Qhi/(double)corr.corrtime));
+	    PyTuple_SetItem(pArgsQQ, 2, PyFloat_FromDouble((double)corr.Qlo/(double)corr.corrtime));
+	    PyTuple_SetItem(pArgsQQ, 3, PyFloat_FromDouble((double)corr.Qhi/(double)corr.corrtime));
 
             // For fifth argument: convert C array to a Python List
             pListII = PyList_New(N);
+            pListQI = PyList_New(N);
+            pListIQ = PyList_New(N);
+            pListQQ = PyList_New(N);
 	   
             for (int i=0; i<N; ++i){
                PyList_SetItem(pListII, i, PyFloat_FromDouble((double)corr.II[i]/(double)corr.corrtime));
+               PyList_SetItem(pListIQ, i, PyFloat_FromDouble((double)corr.IQ[i]/(double)corr.corrtime));
+               PyList_SetItem(pListQI, i, PyFloat_FromDouble((double)corr.QI[i]/(double)corr.corrtime));
+               PyList_SetItem(pListQQ, i, PyFloat_FromDouble((double)corr.QQ[i]/(double)corr.corrtime));
             }
-	    PyTuple_SetItem(pArgs2, 4, pListII);
+	    PyTuple_SetItem(pArgsII, 4, pListII);
+	    PyTuple_SetItem(pArgsIQ, 4, pListIQ);
+	    PyTuple_SetItem(pArgsQI, 4, pListQI);
+	    PyTuple_SetItem(pArgsQQ, 4, pListQQ);
 
 
 	    // DEBUG print uncorrected
-	    printf("XY   ");
-            for (int i=0; i<10; ++i)
-               printf("%d ", corr.II[i]);
-	    printf("\n");
+	    if (DEBUG) {
+	       printf("XY   ");
+               for (int i=0; i<10; ++i)
+                  printf("%d ", corr.II[i]);
+	       printf("\n");
+	    }
 
    
             // Call the function
-            pValueII = PyObject_CallObject(pFunc2, pArgs2);
+            pValueII = PyObject_CallObject(pFunc2, pArgsII);
+            pValueIQ = PyObject_CallObject(pFunc2, pArgsIQ);
+            pValueQI = PyObject_CallObject(pFunc2, pArgsQI);
+            pValueQQ = PyObject_CallObject(pFunc2, pArgsQQ);
    
             // Check for errors
-            if (pValueII != NULL) {
+            if (pValueII != NULL && pValueIQ != NULL && pValueQI != NULL && pValueQQ != NULL) {
                // Extract the values from the returned list
                for (int i=0; i<N; ++i){
                   corr.II[i] = (int32_t) (0.5 * corr.corrtime * PyFloat_AsDouble(PyList_GetItem(pValueII, i)));
+                  corr.IQ[i] = (int32_t) (0.5 * corr.corrtime * PyFloat_AsDouble(PyList_GetItem(pValueIQ, i)));
+                  corr.QI[i] = (int32_t) (0.5 * corr.corrtime * PyFloat_AsDouble(PyList_GetItem(pValueQI, i)));
+                  corr.QQ[i] = (int32_t) (0.5 * corr.corrtime * PyFloat_AsDouble(PyList_GetItem(pValueQQ, i)));
                }
-	       Py_DECREF(pValueII);
+	       //Py_DECREF(pValueII);
             } else{
 	       PyErr_Print();
 	    }
 
 
 	    // DEBUG print corrected
-	    printf("XYqc ");
-            for (int i=0; i<10; ++i)
-               printf("%d ", corr.II[i]);
-	    printf("\n");
-	    printf("\n");
+	    if (DEBUG) {
+	       printf("XYqc ");
+               for (int i=0; i<10; ++i)
+                  printf("%d ", corr.II[i]);
+	       printf("\n");
+	       printf("\n");
+	    }
 
 
 	    // Clean Up
-	    //Py_DECREF(pListII); // Need these next loop, only created at start of callback()
+	    // Py_DECREF(pListII);
          } else {
 	    if (PyErr_Occurred()) {
 	       PyErr_Print();
 	       fprintf(stderr, "Cannot find function\n");
 	    }
 	 }
-	 //Py_XDECREF(pFunc2); // Need these next loop, only created at start of callback()
+	 //Py_XDECREF(pFunc2);
 	 //Py_DECREF(pModule);
       } else {
 	 PyErr_Print();
@@ -428,6 +485,9 @@ void const callback(char *filein){
 
       // GET THE QUANTIZATION CORRECTED LAGS BACK AND USE BELOW !!!
    
+
+
+
 
       // Combine IQ lags into R[]
          for(int i=0; i<(2*N)-1; i++){
@@ -472,7 +532,8 @@ void const callback(char *filein){
       Qpwr = 2. * pow((VQhi-VQlo),2) * PyFloat_AsDouble(pValue);
 
       // Output the relative power comparison
-      printf("Ipwr is %f\tQpwr is %f\tP_I is %f\tP_Q is %f\n", Ipwr, Qpwr, P_I, P_Q);
+      if (DEBUG)
+         printf("Ipwr is %f\tQpwr is %f\tP_I is %f\tP_Q is %f\n", Ipwr, Qpwr, P_I, P_Q);
 
       // Header information in spectra file
       fprintf(fout, "UNIXTIME\t%" PRIu64 "\n", UNIXTIME);
@@ -488,7 +549,7 @@ void const callback(char *filein){
       fprintf(fout, "IHI\t%u\n",  corr.Ihi);
       fprintf(fout, "QHI\t%u\n",  corr.Qhi);
       fprintf(fout, "ILO\t%u\n",  corr.Ilo);
-      fprintf(fout, "ILO\t%u\n",  corr.Qlo);
+      fprintf(fout, "QLO\t%u\n",  corr.Qlo);
 
     // Used calibration DAC voltages
       fprintf(fout, "VIHI\t%.3f\nVQHI\t%.3f\nVILO\t%.3f\nVQLO\t%.3f\n", VIhi, VQhi, VIlo, VQlo);
@@ -523,7 +584,6 @@ void const callback(char *filein){
       //Print in counts per second (assuming 5000 MHz sampling freq)
       for(int i=0; i<2*N; i++){
          fprintf(fout, "%d\t%lf\n", (5000*i)/(2*N), (5000.*1e6)/(corr.corrtime*256.) * sqrt(P_I*P_Q) * sqrt(fabs(spec[specA].out[i][0]*(-1*spec[specA].out[i][1]))));
-         fprintf(fout, "%d\t%lf\n", (5000*i)/(2*N), (5000.*1e6)/(corr.corrtime*256.) * sqrt(P_I*P_Q) * sqrt(fabs(spec[specA].out[i][0]*(-1*spec[specA].out[i][1]))));
       }
       fclose(fout); //close single spectra file
 
@@ -533,11 +593,23 @@ void const callback(char *filein){
       free(corr.QQ);
       free(Rn);
       free(Rn2);
-
    }
 
 
-//////////////////////////////  LOOP OVER ALL SPECTRA IN FILE  ///////////////////////////////////
+Py_DECREF(pArgs1);
+Py_DECREF(pValue);
+
+Py_DECREF(pListII);
+Py_DECREF(pListIQ);
+Py_DECREF(pListQI);
+Py_DECREF(pListQQ);
+
+Py_DECREF(pValueII);
+Py_DECREF(pValueQI);
+Py_DECREF(pValueIQ);
+Py_DECREF(pValueQQ);
+
+/////////////////////////////  LOOP OVER ALL SPECTRA IN FILE  ///////////////////////////////////
    
       fclose(fp);   //close input file
 		    
