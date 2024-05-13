@@ -282,7 +282,7 @@ void const callback(char *filein){
          printf("#                        Exiting!                        #\n");
          printf("#                                                        #\n");
          printf("######################## ERROR ###########################\n");
-         break;
+         //break;
       }
 
       // Initialize the Influx DB
@@ -305,27 +305,21 @@ void const callback(char *filein){
       VIlo = dacV[2];
       VQlo = dacV[3];
 
-      // DEBUG
-      if (DEBUG)
-         printf("VIhi %.3f\tVQhi %.3f\tVIlo %.3f\tVQlo %.3f\n", VIhi, VQhi, VIlo, VQlo);
-
-      // this section here unfuck-ifys special cases where ICE was off by one
+      // this section unfuck-ifys special cases when ICE was off by one
       if (VQlo==0.){
         VIhi=VIhi-(VIlo-VQhi);  //make up this lost data, it'l be close enough
         VQhi = dacV[0];
         VIlo = dacV[1];
         VQlo = dacV[2];
       }
-
       
       // DEBUG
       if (DEBUG)
          printf("VIhi %.3f\tVQhi %.3f\tVIlo %.3f\tVQlo %.3f\n", VIhi, VQhi, VIlo, VQlo);
 
-
-      if(VIhi==0.){ //Still no values?  break and don't make spectra
+      if(VIhi==0.){ //Still no values?  bail and don't make spectra
         printf("no DAC values, bailing.\n");
-        break;
+        //break;
       }
 
 
@@ -380,8 +374,6 @@ void const callback(char *filein){
       if (pModule != NULL) {
          // Get the function from the module
          //pFunc2 = PyObject_GetAttrString(pModule, "qc");
-printf("%d\n", PyCallable_Check(pFunc2));
-printf("here\n");
 
          if (pFunc2 && PyCallable_Check(pFunc2)) {
             // For first four arguments: XmonL, XmonH, YmonL, YmonH
@@ -431,7 +423,6 @@ printf("here\n");
                   printf("%d ", corr.II[i]);
 	       printf("\n");
 	    }
-
    
             // Call the function
             pValueII = PyObject_CallObject(pFunc2, pArgsII);
@@ -596,18 +587,18 @@ printf("here\n");
    }
 
 
-Py_DECREF(pArgs1);
-Py_DECREF(pValue);
+//Py_INCREF(pArgs1);
+//Py_INCREF(pValue);
 
-Py_DECREF(pListII);
-Py_DECREF(pListIQ);
-Py_DECREF(pListQI);
-Py_DECREF(pListQQ);
+//Py_INCREF(pListII);
+//Py_INCREF(pListIQ);
+//Py_INCREF(pListQI);
+//Py_INCREF(pListQQ);
 
-Py_DECREF(pValueII);
-Py_DECREF(pValueQI);
-Py_DECREF(pValueIQ);
-Py_DECREF(pValueQQ);
+//Py_INCREF(pValueII);
+//Py_INCREF(pValueQI);
+//Py_INCREF(pValueIQ);
+//Py_INCREF(pValueQQ);
 
 /////////////////////////////  LOOP OVER ALL SPECTRA IN FILE  ///////////////////////////////////
    
