@@ -5,6 +5,7 @@ import glob
 import math
 import random
 import numpy as np
+from scipy import interpolate
 from influxdb import InfluxDBClient
 
 from astropy import units as u
@@ -110,7 +111,7 @@ def doStuff(self):
 
 
    if (Ta_std > Ta_rms*2):
-      return (0, 0, 0, 0)
+      return (0, 0, 0)
 
    print("T_sys\t\t{:.1f}".format(Tsys_mean))
    print("Calculated Ta_rms\t{:.1f}".format(Ta_rms))
@@ -131,7 +132,7 @@ def doStuff(self):
      y_flat[i] = Ta[i+x0] - p(x_flat[i])
 
    # Return the current (ra,dec) position and fit VLSR and Ta* vectors
-   data = (ra, dec, x_flat, y_flat)
+   data = (ra, dec, sum(y_flat))
    return data
 
 
@@ -158,42 +159,35 @@ def regrid(ra, dec, T, beam):
 ################################################################################
 
 
-
 # Point to raw data to use
-file_pattern = f'./spectra/ACS3_OTF_1475*_DEV4_INDX*_NINT002.txt'
+file_pattern = f'./spectra/ACS3_OTF_14*_DEV4_INDX*_NINT002.txt'
 search_files = sorted(glob.glob(file_pattern))
 
 # Initialize empty lists to accumulate data
 ra_list = []
 dec_list = []
-vlsr_list = []
 Ta_list = []
-
-
 
 for file in search_files:
     # get ra, dec, and calibrated spectra from each OTF file
     print("trying OTF file: ", file)
-    (ra, dec, vlsr, Ta) = doStuff(file)
+    (ra, dec, Ta) = doStuff(file)
 
     if(ra!=0):
        ra_list.append(ra)
        dec_list.append(dec)
        Ta_list.append(Ta)
 
-
-
 # Convert lists to numpy arrays
 ra  = np.array(ra_list)
 dec = np.array(dec_list)
-vlsr= np.array(vlsr_list)
 Ta  = np.array(Ta_list)
 
 
 # open a new blank FITS file
 hdr = fits.Header()
-hdr['NAXIS']   = 3
-hdr['OBJECT']  = 'My data cube'
+hdr['NAXIS']   = 2
+hdr['OBJECT']  = 'My data img '
 hdr['DATAMIN'] = min(Ta)
 hdr['DATAMAX'] = max(Ta)
 hdr['BUNIT']   = 'K (Ta*)     '
@@ -212,13 +206,6 @@ hdr['CRPIX2']  = 0                  # reference pixel array index
 hdr['CROTA2']  = 0
 hdr['CUNIT2']  = 'deg         '
 
-hdr['CTYPE3']  = 'VLSR        '
-hdr['CRVAL3']  = min(vlsr)
-hdr['CDELT3']  = 0.771              # 771 m/s spectral resolution
-hdr['CRPIX3']  = 0                  # reference pixel array index
-hdr['CROTA3']  = 0
-hdr['CUNIT3']  = 'm/s         '
-
 hdr['OBJECT']  = 'NGC6334     '
 hdr['RADESYS'] = 'FK5         '
 hdr['RA']      = min(ra)            # Fiducial is arbitrarily (ra,dec) min
@@ -228,15 +215,12 @@ hdr['LINE']    = 'C+          '
 hdr['RESTFREQ']= 1900.5369          # GHz
 hdr['VELOCITY']= 0
 
-
-# Create an empty data_cube and fill with regridded data
-data_cube = np.zeros([len(Ta[0]), len(dec), len(ra)])
-for i in range(0, 100):
-   data_cube[i] = np.zeros([len(Ta[0]), len(dec), len(ra)])
+# Do the regridding
+ra_grid, dec_grid, T_img= regrid(ra, dec, Ta, 0.02)
 
 # Write the data cube and header to a FITS file
-hdu = fits.PrimaryHDU(data=data_cube, header=hdr)
-hdu.writeto('my_data_cube.fits', overwrite=True)
+hdu = fits.PrimaryHDU(data=T_img, header=hdr)
+hdu.writeto('my_data_image.fits', overwrite=True)
 
 
 

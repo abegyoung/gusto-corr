@@ -42,6 +42,7 @@ def doStuff(self):
 
    # TODO: there is an error in sculptor's udpPointing database in timezone, offset -7hrs (25200secs)
    myquery = 'SELECT last(*) FROM "udpPointing" WHERE "scanID"=~/({:s})/'.format(str(scanID)) + ' AND time>{:d}'.format(int((unixtime_otf-0.5-25200)*1e9)) + ' AND time<{:d}'.format(int((unixtime_otf+0.5-25200)*1e9))
+   print(myquery)
    points = client.query(myquery).get_points()
    for point in points:
        ra   = point.get('last_RA')
@@ -52,9 +53,9 @@ def doStuff(self):
    # Find suitable calibration files
    # OTF HOT will have the same scanID as the OTF.  Just find the nearest
    deltat = 1000
-   hot_file_pattern = f'../GUSTO-DATA/spectra/ACS3_HOT_{str(scanID-1)}_DEV4_INDX*'
+   hot_file_pattern = f'./spectra/ACS3_HOT_{str(scanID-1)}_DEV4_INDX*'
    search_files = glob.glob(hot_file_pattern)
-   #print("found HOT files: ", search_files)
+   print("found HOT files: ", search_files)
    for file in search_files:
        fp = open(file, 'r')
        unixtime_hot = int(fp.readline().split('\t')[1])
@@ -66,9 +67,9 @@ def doStuff(self):
    # Find suitable calibration files
    # OTF HOT will have the same scanID as the OTF.  Just find the nearest
    deltat = 1000
-   ref_file_pattern = f'../GUSTO-DATA/spectra/ACS3_REF_{str(scanID-1)}_DEV4_INDX*'
+   ref_file_pattern = f'./spectra/ACS3_REF_{str(scanID-1)}_DEV4_INDX*'
    search_files = glob.glob(ref_file_pattern)
-   #print("found REF files: ", search_files)
+   print("found REF files: ", search_files)
    for file in search_files:
        fp = open(file, 'r')
        unixtime_ref = int(fp.readline().split('\t')[1])
@@ -96,8 +97,8 @@ def doStuff(self):
    Ta_rms  = (1.0*Tsys_mean)/math.sqrt(5000000*0.33)	# Radiometer Equation
    Ta_std = np.std(Ta[x0:x1], axis=0)		# std deviation of data
 
-   #if (Ta_std > Ta_rms*2):
-   #   return
+   if (Ta_std > Ta_rms*2):
+      return
 
    print("T_sys\t\t{:.1f}".format(Tsys_mean))
    print("Calculated Ta_rms\t{:.1f}".format(Ta_rms))
@@ -136,7 +137,7 @@ def doStuff(self):
 
 
 # Point to raw data to use
-file_pattern = f'../GUSTO-DATA/spectra/ACS3_OTF_14771_DEV4_INDX*_NINT*'
+file_pattern = f'./spectra/ACS3_OTF_14771_DEV4_INDX*_NINT*'
 scanID = int(file_pattern.split("_")[2])
 search_files = glob.glob(file_pattern)
 
@@ -150,6 +151,7 @@ header.set('SIMPLE', True)
 header.set('BITPIX', 8)
 header.set('NAXIS', 0)
 header.set('EXTEND', True)
+header.set('ORIGIN', 'GUSTO'
 hdu = fits.PrimaryHDU(header=header)
 hdulist = fits.HDUList([hdu])
 hdulist.writeto(fits_filename)
@@ -166,16 +168,33 @@ for file in search_files:
     header.set('NAXIS', 1)             # number of array dimensions
     header.set('NAXIS1', 102)          # length of dimension 1
     header.set('TFIELDS', 4)           # length of table fields
-    header.set('TTYPE1', 'RA')
+    header.set('TTYPE1', 'RA')         # Longitude - like axis
     header.set('TFORM1', 'D')
-    header.set('TTYPE2', 'DEC')
+    header.set('TTYPE2', 'DEC')        # Latitude - like axis
     header.set('TFORM2', 'D')
-    header.set('TTYPE3', 'vlsr')
+    header.set('TTYPE3', 'vlsr')       # Velocity - like axis
     header.set('TFORM3', 'D')
     header.set('TDIM3', '(1024)')
     header.set('TTYPE4', 'Ta')
     header.set('TFORM4', 'D')
     header.set('TDIM4', '(1024)')
+
+    # CORE columns
+    header.set('TELESCOP', 'GUSTO')         # Designation of telescope
+    header.set('BANDWID', 500000000.0)    # Total bandwidth (Hz)
+    header.set('TTYPE5', 'OBJECT')          # TODO: Auto-fill from catalog
+    header.set('TFORM5', '12A')
+    header.set('TTYPE6', 'DATA-OBS')        # TODO: Auto-fill from catalog
+    header.set('TFORM6', '10A')
+
+
+    header.set('TTYPE7', 'CRPIX1')          # RA of reference pixel
+    header.set('TFORM7', '1I')
+    header.set('TTYPE8', 'CRPIX2')          # DEC of reference pixel
+    header.set('TFORM8', '1I')
+    header.set('TTYPE9', 'CRPIX3')          # Velocity of reference pixel
+    header.set('TFORM9', '1I')
+    header.set('CRPIX3', '-15774.1')        # m/s
 
     # write data and header to fits file
     new_table = fits.BinTableHDU.from_columns([

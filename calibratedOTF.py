@@ -19,13 +19,8 @@ from PyAstronomy import pyasl
 # https://influxdb-python.readthedocs.io/en/latest/index.html
 client = InfluxDBClient('localhost', 8086, '', '', 'gustoDBlp')
 
-myquery = 'SELECT last(*) FROM "HK_TEMP11" WHERE "scanID"=~/({:s})/'.format("14797")
-points = client.query(myquery).get_points()
-for point in points:
-    T_CAL = point.get('last_temp')
 
-
-######################################################################################
+################################################################################
 def doStuff(self):
    SRC_file  = self
    INDX   = int(SRC_file.split("_")[4][4:])
@@ -35,10 +30,15 @@ def doStuff(self):
    unixtime_otf = int(fp.readline().split('\t')[1])
    fp.close()
 
+   myquery = 'SELECT last(*) FROM "HK_TEMP11" WHERE "scanID"=~/({:s})/'.format(str(scanID))
+   points = client.query(myquery).get_points()
+   for point in points:
+       T_CAL = point.get('last_temp')
+
    # Find suitable calibration files
    # OTF HOT will have the same scanID as the OTF.  Just find the nearest
    deltat = 1000
-   hot_file_pattern = f'../GUSTO-DATA/spectra/ACS3_HOT_{str(scanID-1)}_DEV4_INDX*'
+   hot_file_pattern = f'./spectra/ACS3_HOT_{str(scanID-1)}_DEV4_INDX*'
    search_files = glob.glob(hot_file_pattern)
    #print("found HOT files: ", search_files)
    for file in search_files:
@@ -52,7 +52,7 @@ def doStuff(self):
    # Find suitable calibration files
    # OTF HOT will have the same scanID as the OTF.  Just find the nearest
    deltat = 1000
-   ref_file_pattern = f'../GUSTO-DATA/spectra/ACS3_REF_{str(scanID-1)}_DEV4_INDX*'
+   ref_file_pattern = f'./spectra/ACS3_REF_{str(scanID-1)}_DEV4_INDX*'
    search_files = glob.glob(ref_file_pattern)
    #print("found REF files: ", search_files)
    for file in search_files:
@@ -63,9 +63,9 @@ def doStuff(self):
            REF_file = file 
            best=abs(unixtime_otf-unixtime_ref)
 
-   SRC_data = np.loadtxt(SRC_file,  skiprows=25)
+   SRC_data = np.loadtxt(SRC_file, skiprows=25)
    HOT_data = np.loadtxt(HOT_file, skiprows=25)
-   REF_data = np.loadtxt(REF_file,  skiprows=25)
+   REF_data = np.loadtxt(REF_file, skiprows=25)
    
    y = HOT_data[:,1] / REF_data[:,1]
    y = (y-1)/1.3 + 1	# 30% non-linearity in backend
@@ -85,11 +85,10 @@ def doStuff(self):
    if (Ta_std > Ta_rms*2):
       return
 
-
-   #print("T_sys\t\t{:.1f}".format(Tsys_mean))
-   #print("Calculated Ta_rms\t{:.1f}".format(Ta_rms))
-   #print("Spectral mean\t\t{:.1f}".format(Ta_std))
-   print("{:.1f}\t{:.1f}\t{:.1f}".format(Tsys_mean, Ta_rms, Ta_std))
+   print("T_sys\t\t{:.1f}".format(Tsys_mean))
+   print("Calculated Ta_rms\t{:.1f}".format(Ta_rms))
+   print("Spectral mean\t\t{:.1f}\n".format(Ta_std))
+   #print("{:.1f}\t{:.1f}\t{:.1f}".format(Tsys_mean, Ta_rms, Ta_std))
    
    # Remove DC offset from T_A*
    Ta = Ta - Ta_mean			
@@ -105,7 +104,7 @@ def doStuff(self):
 
    # Plot
    plt.plot(x_flat, y_flat, drawstyle='steps', linewidth=2)
-   plt.plot((SRC_data[:,0]-1100)*0.158, Ta, drawstyle='steps', linewidth=1)
+   #plt.plot((SRC_data[:,0]-1100)*0.158, Ta, drawstyle='steps', linewidth=1)
    plt.hlines(np.mean(Ta[x0:x1])+Ta_std, -100, 100)
    plt.hlines(np.mean(Ta[x0:x1])-Ta_std, -100, 100)
    plt.xlim((-50,80))
@@ -115,14 +114,15 @@ def doStuff(self):
    # Compute and display 1 sigma and radiometer eqn.
    plt.text(0.7, 0.92, r"$\frac{{T_{{sys}}}} {{\sqrt{{\Delta\nu \star t_{{int}}}}}}$ {:.1f}".format(Ta_rms), transform=a.transAxes)
    plt.text(0.7, 0.85, "Ta_std {:.1f}".format(Ta_std), transform=a.transAxes)
-   plt.show()
     
 
 
-file_pattern = f'../GUSTO-DATA/spectra/ACS3_OTF_146*_DEV4_INDX00*_NINT0*'
+file_pattern = f'./spectra/ACS3_OTF_1463*_DEV4_INDX000*_NINT0*'
 search_files = glob.glob(file_pattern)
 plt.figure()
 for file in search_files:
     #print("trying OTF file: ", file)
     doStuff(file)
+
+plt.show()
 
