@@ -160,7 +160,7 @@ def regrid(ra, dec, T, beam):
 
 
 # Point to raw data to use
-file_pattern = f'./spectra/ACS3_OTF_14*_DEV4_INDX*_NINT002.txt'
+file_pattern = f'./spectra/ACS3_OTF_14*_DEV4_INDX*_NINT*.txt'
 search_files = sorted(glob.glob(file_pattern))
 
 # Initialize empty lists to accumulate data
@@ -187,7 +187,6 @@ Ta  = np.array(Ta_list)
 # open a new blank FITS file
 hdr = fits.Header()
 hdr['NAXIS']   = 2
-hdr['OBJECT']  = 'My data img '
 hdr['DATAMIN'] = min(Ta)
 hdr['DATAMAX'] = max(Ta)
 hdr['BUNIT']   = 'K (Ta*)     '
@@ -199,7 +198,7 @@ hdr['CRPIX1']  = 0                  # reference pixel array index
 hdr['CROTA1']  = 0
 hdr['CUNIT1']  = 'deg         '
 
-hdr['CTYPE2']  = 'Dec         '
+hdr['CTYPE2']  = 'DEC         '
 hdr['CRVAL2']  = min(dec)
 hdr['CDELT2']  = 0.016              # 1 arcmin beam
 hdr['CRPIX2']  = 0                  # reference pixel array index
@@ -219,8 +218,8 @@ hdr['VELOCITY']= 0
 ra_grid, dec_grid, T_img= regrid(ra, dec, Ta, 0.02)
 
 # Write the data cube and header to a FITS file
-hdu = fits.PrimaryHDU(data=T_img, header=hdr)
-hdu.writeto('my_data_image.fits', overwrite=True)
+#hdu = fits.PrimaryHDU(data=T_img, header=hdr)
+#hdu.writeto('my_data_image.fits', overwrite=True)
 
 
 

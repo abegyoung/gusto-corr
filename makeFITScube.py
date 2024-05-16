@@ -5,6 +5,7 @@ import glob
 import math
 import random
 import numpy as np
+from scipy import interpolate
 from influxdb import InfluxDBClient
 
 from astropy import units as u
@@ -143,8 +144,6 @@ def regrid(ra, dec, T, beam):
    # Calculate number of grid points
    N_ra = int(np.ceil((ra_max - ra_min) / beam))
    N_dec = int(np.ceil((dec_max - dec_min) / beam))
-   print(N_ra)
-   print(N_dec)
 
    # Create meshgrid
    ra_grid, dec_grid = np.meshgrid(np.linspace(ra_min, ra_max, N_ra),np.linspace(dec_min, dec_max, N_dec))
@@ -160,7 +159,7 @@ def regrid(ra, dec, T, beam):
 
 
 # Point to raw data to use
-file_pattern = f'./spectra/ACS3_OTF_1475*_DEV4_INDX*_NINT002.txt'
+file_pattern = f'./spectra/ACS3_OTF_14*_DEV4_INDX*_NINT*.txt'
 search_files = sorted(glob.glob(file_pattern))
 
 # Initialize empty lists to accumulate data
@@ -168,7 +167,6 @@ ra_list = []
 dec_list = []
 vlsr_list = []
 Ta_list = []
-
 
 
 for file in search_files:
@@ -179,8 +177,8 @@ for file in search_files:
     if(ra!=0):
        ra_list.append(ra)
        dec_list.append(dec)
+       vlsr_list.append(vlsr)
        Ta_list.append(Ta)
-
 
 
 # Convert lists to numpy arrays
@@ -194,26 +192,26 @@ Ta  = np.array(Ta_list)
 hdr = fits.Header()
 hdr['NAXIS']   = 3
 hdr['OBJECT']  = 'My data cube'
-hdr['DATAMIN'] = min(Ta)
-hdr['DATAMAX'] = max(Ta)
+hdr['DATAMIN'] = 0
+hdr['DATAMAX'] = 1
 hdr['BUNIT']   = 'K (Ta*)     '
 
 hdr['CTYPE1']  = 'RA          '
-hdr['CRVAL1']  = min(ra)
+hdr['CRVAL1']  = 260
 hdr['CDELT1']  = 0.016              # 1 arcmin beam
 hdr['CRPIX1']  = 0                  # reference pixel array index
 hdr['CROTA1']  = 0
 hdr['CUNIT1']  = 'deg         '
 
-hdr['CTYPE2']  = 'Dec         '
-hdr['CRVAL2']  = min(dec)
+hdr['CTYPE2']  = 'DEC         '
+hdr['CRVAL2']  = -35
 hdr['CDELT2']  = 0.016              # 1 arcmin beam
 hdr['CRPIX2']  = 0                  # reference pixel array index
 hdr['CROTA2']  = 0
 hdr['CUNIT2']  = 'deg         '
 
 hdr['CTYPE3']  = 'VLSR        '
-hdr['CRVAL3']  = min(vlsr)
+hdr['CRVAL3']  = -15
 hdr['CDELT3']  = 0.771              # 771 m/s spectral resolution
 hdr['CRPIX3']  = 0                  # reference pixel array index
 hdr['CROTA3']  = 0
@@ -221,18 +219,29 @@ hdr['CUNIT3']  = 'm/s         '
 
 hdr['OBJECT']  = 'NGC6334     '
 hdr['RADESYS'] = 'FK5         '
-hdr['RA']      = min(ra)            # Fiducial is arbitrarily (ra,dec) min
-hdr['DEC']     = min(dec)
+hdr['RA']      = 260                # Fiducial is arbitrarily (ra,dec) min
+hdr['DEC']     = -35
 hdr['EQUINOX'] = 2000
 hdr['LINE']    = 'C+          '
 hdr['RESTFREQ']= 1900.5369          # GHz
 hdr['VELOCITY']= 0
 
+# Beam size (deg)
+beam = 0.02
+
+# Calculate the range of ra and dec values
+dec_min, dec_max= np.min(dec), np.max(dec)
+ra_min , ra_max = np.min(ra) , np.max(ra)
+# Calculate number of grid points
+N_Ta = len(Ta[0])
+N_dec = int(np.ceil((dec_max - dec_min) / beam))
+N_ra = int(np.ceil((ra_max - ra_min) / beam))
 
 # Create an empty data_cube and fill with regridded data
-data_cube = np.zeros([len(Ta[0]), len(dec), len(ra)])
-for i in range(0, 100):
-   data_cube[i] = np.zeros([len(Ta[0]), len(dec), len(ra)])
+data_cube = np.zeros([N_Ta, N_dec, N_ra])
+for i in range(0, N_Ta):
+   ra_grid, dec_grid, avg_T = regrid(ra, dec, Ta[:,i], beam)
+   data_cube[i] = avg_T
 
 # Write the data cube and header to a FITS file
 hdu = fits.PrimaryHDU(data=data_cube, header=hdr)
