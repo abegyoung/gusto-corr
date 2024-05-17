@@ -159,7 +159,7 @@ def regrid(ra, dec, T, beam):
 
 
 # Point to raw data to use
-file_pattern = f'./spectra/ACS3_OTF_14*_DEV4_INDX*_NINT*.txt'
+file_pattern = f'./spectra/ACS3_OTF_14*_DEV4_INDX0000_NINT00*.txt'
 search_files = sorted(glob.glob(file_pattern))
 
 # Initialize empty lists to accumulate data
@@ -174,7 +174,7 @@ for file in search_files:
     print("trying OTF file: ", file)
     (ra, dec, vlsr, Ta) = doStuff(file)
 
-    if(ra!=0):
+    if(ra!=0 and np.isnan(np.sum(Ta))!=True):
        ra_list.append(ra)
        dec_list.append(dec)
        vlsr_list.append(vlsr)
@@ -186,6 +186,7 @@ ra  = np.array(ra_list)
 dec = np.array(dec_list)
 vlsr= np.array(vlsr_list)
 Ta  = np.array(Ta_list)
+
 
 
 # open a new blank FITS file
@@ -230,22 +231,22 @@ hdr['VELOCITY']= 0
 beam = 0.02
 
 # Calculate the range of ra and dec values
-dec_min, dec_max= np.min(dec), np.max(dec)
-ra_min , ra_max = np.min(ra) , np.max(ra)
+#dec_min, dec_max= np.min(dec), np.max(dec)
+#ra_min , ra_max = np.min(ra) , np.max(ra)
 # Calculate number of grid points
-N_Ta = len(Ta[0])
-N_dec = int(np.ceil((dec_max - dec_min) / beam))
-N_ra = int(np.ceil((ra_max - ra_min) / beam))
+#N_Ta = len(Ta[0])
+#N_dec = int(np.ceil((dec_max - dec_min) / beam))
+#N_ra = int(np.ceil((ra_max - ra_min) / beam))
 
 # Create an empty data_cube and fill with regridded data
-data_cube = np.zeros([N_Ta, N_dec, N_ra])
-for i in range(0, N_Ta):
-   ra_grid, dec_grid, avg_T = regrid(ra, dec, Ta[:,i], beam)
-   data_cube[i] = avg_T
+#data_cube = np.zeros([N_Ta, N_dec, N_ra])
+#for i in range(0, N_Ta):
+   #ra_grid, dec_grid, avg_T = regrid(ra, dec, Ta[:,i], beam)
+   #data_cube[i] = avg_T
 
 # Write the data cube and header to a FITS file
-hdu = fits.PrimaryHDU(data=data_cube, header=hdr)
-hdu.writeto('my_data_cube.fits', overwrite=True)
+#hdu = fits.PrimaryHDU(data=data_cube, header=hdr)
+#hdu.writeto('my_data_cube.fits', overwrite=True)
 
 
 

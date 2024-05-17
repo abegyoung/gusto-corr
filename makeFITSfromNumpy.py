@@ -1,18 +1,47 @@
 import numpy as np
 from astropy.io import fits
+from scipy import interpolate
 
->>> data_cube.shape
+'''
+data_cube.shape
 (102, 94, 170)
->>> ra.shape
+ra.shape
 (73328,)
->>> dec.shape
+dec.shape
 (73328,)
->>> vlsr.shape
+vlsr.shape
 (73328, 102)
->>> Ta.shape
+Ta.shape
 (73328, 102)
+'''
 
-data_cube=np.fromfile('cube.dat', dtype=np.float64).reshape((102,94,170))
+def regrid(ra, dec, T, beam):
+   # Ready rotation
+   RotRad = -0.7
+   RotMatrix = np.array([[np.cos(RotRad), np.sin(RotRad)],
+                         [-np.sin(RotRad), np.cos(RotRad)]])
+
+   # Calculate the range of ra and dec values
+   ra_min , ra_max = np.min(ra) , np.max(ra)
+   dec_min, dec_max= np.min(dec), np.max(dec)
+
+   # Calculate number of grid points
+   N_ra = int(np.ceil((ra_max - ra_min) / beam))
+   N_dec = int(np.ceil((dec_max - dec_min) / beam))
+
+   # Create meshgrid
+   ra_grid, dec_grid = np.meshgrid(np.linspace(ra_min, ra_max, N_ra),np.linspace(dec_min, dec_max, N_dec))
+   #ra_grid, dec_grid = np.einsum('ji, mni -> jmn', RotMatrix, np.dstack([ra_grid, dec_grid]))
+
+   # Initialize array
+   avg_T = interpolate.griddata((ra, dec), T, (ra_grid, dec_grid), method='nearest')
+
+   return ra_grid, dec_grid, avg_T
+
+ra  =np.fromfile('ra.dat',   dtype=np.float64)
+dec =np.fromfile('dec.dat',  dtype=np.float64)
+vlsr=np.fromfile('vlsr.dat', dtype=np.float64).reshape((73328,102))
+Ta  =np.fromfile('Ta.dat',   dtype=np.float64).reshape((73328,102))
 
 # Beam size (deg)
 beam = 0.02
