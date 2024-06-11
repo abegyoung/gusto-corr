@@ -4,4 +4,8 @@ corrspec
 *.log
 .*.swp
 prog
+prog_ref
+prog_qc
 **/*/*/__pycache__/
+*.dat
+*.fits

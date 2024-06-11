@@ -8,6 +8,7 @@ import numpy as np
 import datetime
 from influxdb import InfluxDBClient
 #from influxdb_client import InfluxDBClient
+from tqdm import tqdm
 
 from astropy import units as u
 from astropy.coordinates import SkyCoord
@@ -27,17 +28,21 @@ database = 'gustoDBlp'
 retention_policy = 'autogen'
 bucket = f'{database}/{retention_policy}'
 
-# Center of Spitzer NGC6334
-ra  = '+17h20m45s'
-dec = '-35d56m45s'
+# Center of GUSTO 30 K line in NGC6334
+ra_center  = '+17h22m10s'
+dec_center = '-35d57m35s'
+
+# center of Spitzer NGC6334 8um image
+#ra_center = '+17h20m00s'
+#dec_center = '-35d56m25s'
 
 # half-beam size
-size = 220*u.arcsec
-c = SkyCoord(ra, dec, frame='icrs')
+size = 120*u.arcsec
+c = SkyCoord(ra_center, dec_center, frame='icrs')
 
 # half-image size
-ra_img =  45.0*u.arcmin
-dec_img = 37.5*u.arcmin
+ra_img =  30*u.arcmin
+dec_img = 30*u.arcmin
 
 # Use influxdb for V1.0
 # https://influxdb-python.readthedocs.io/en/latest/index.html
@@ -53,12 +58,9 @@ end_dec   = c.dec.deg + dec_img.to(u.deg).value
 N_dec     = int(dec_img.to(u.arcmin).value/size.to(u.arcmin).value)
 dec_indx = np.linspace(start_dec, end_dec, N_dec)
 
-print(N_ra)
-print(N_dec)
-
 my_list=[]
 
-for ra in ra_indx:
+for ra in tqdm(ra_indx):
     numi += 1
     numj = 0
     for dec in dec_indx:
@@ -76,7 +78,10 @@ for ra in ra_indx:
         for point in points:
             my_list.append(point.get("scanID"))
 
+
 print(sorted(list(set(my_list))))
+print(min(my_list))
+print(max(my_list))
 
 
 

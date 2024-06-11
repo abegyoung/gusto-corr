@@ -1,11 +1,45 @@
+# Data reduction
+# 1) get all series_* files
+
+# 2) check xz files with xz -t series_*.tar.xz for corrupt files.
+# put filenames in corrupt_files.txt
+
+# 3) rename all files to series_12345_12345.tar.xz
+
+# 4) untar all series files for NGC6334 from 14597 - 14955 
+# use script:
+# bash untar.sh STARTING_scanID ENDING_scanID
+for file in series_14[5-9][0-9][0-9]_*; 
+   do [[ "$file" =~ series_14([0-9]{3})_.* && ${BASH_REMATCH[1]} 
+      -ge 596 && ${BASH_REMATCH[1]} -le 955 && -e "$file" ]] && 
+      tar xf "$file";done
+
+# to untar specific files (say udp_* files)
+tar xf series_13772_13775.tar.xz --wildcards --no-anchored 'udp*'
+
+# Take the newly formed udp_xxxx.dat files and make a udp.txt file
+for f in udp*;do ../gusto-corr/udp-file $f >> udp.txt;done
+
+# if adding new UDP data to the DB, delete the previous incomplete set to avoid duplicates
+use gustoDBlp
+DROP MEASUREMENT udpPointing
+python3 writeRADEC.py udp.txt
+
+
+
+
+
+
 # PS map data reduction script
 for i in `seq 6589 4 6782`;do python3 ../coadd_glob.py "ACS3_SRC_0$i*DEV4*" "ACS3_REF_0`echo $i-1|bc`*DEV4*";done
 
 # make a movie
+# make and use a palette to avoid coloring artifacts
 ffmpeg -r 2 -i NGC3603-%02d.png -i palette.png -lavfi paletteuse test.gif
 ffmpeg -r 2 -f image2 -s 640x480 -i NGC3603-%02d.png -vcodec libx264 -crf 25  -pix_fmt yuv420p test.mp4
 
 # make a 7x7 plot (uncomment thumbnails in coadd_glob
+# tile 1x7 then tile 7x1 to rotate tiles 90 degrees
 montage NGC3603-*.png -tile 1x7 -trim -mode Concatenate miff:- | montage - -geometry +0+0 -tile 7x1 result.png
 
 
