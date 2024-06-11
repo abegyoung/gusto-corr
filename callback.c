@@ -10,9 +10,101 @@
 
 #include <Python.h>
 
+#include <stdio.h>
+#include <fitsio.h>
+
 #define PI 3.14159
 #define BUFSIZE 128
 #define DEBUG 1
+
+
+void append_to_fits_table(const char *filename, double *array, long n_elements) {
+    fitsfile *fptr;  // FITS file pointer
+    int status = 0;  // CFITSIO status value MUST be initialized to zero!
+    int hdutype;
+    long nrows;
+    char extname[] = "DATA_TABLE";
+
+    // Try to open the FITS file in read/write mode. If it doesn't exist, create a new one.
+    if (fits_open_file(&fptr, filename, READWRITE, &status)) {
+        if (status == FILE_NOT_OPENED) {
+            status = 0;  // Reset the status
+            if (fits_create_file(&fptr, filename, &status)) {
+                fits_report_error(stderr, status);  // Print any error message
+                return;
+            }
+
+            // Create a primary array image (needed before any extensions can be created)
+            if (fits_create_img(fptr, BYTE_IMG, 0, NULL, &status)) {
+                fits_report_error(stderr, status);  // Print any error message
+                return;
+            }
+
+            // Define the column parameters
+            char **ttype = malloc(n_elements * sizeof(char*));
+            char **tform = malloc(n_elements * sizeof(char*));
+            char **tunit = malloc(n_elements * sizeof(char*));
+            for (long i = 0; i < n_elements; i++) {
+                ttype[i] = malloc(10 * sizeof(char));
+                snprintf(ttype[i], 10, "Data%ld", i+1);
+                tform[i] = "D";
+                tunit[i] = "";
+            }
+
+            // Create a binary table
+	    //  fits_create_tbl(
+            if (fits_create_tbl(fptr, BINARY_TBL, 0, n_elements, ttype, tform, tunit, extname, &status)) {
+                fits_report_error(stderr, status);  // Print any error message
+                return;
+            }
+
+            for (long i = 0; i < n_elements; i++) {
+                free(ttype[i]);
+            }
+            free(ttype);
+            free(tform);
+            free(tunit);
+        } else {
+            fits_report_error(stderr, status);  // Print any error message
+            return;
+        }
+    }
+    
+
+    // Move to the named HDU (where the table is stored)
+    if (fits_movnam_hdu(fptr, BINARY_TBL, extname, 0, &status)) {
+        fits_report_error(stderr, status);  // Print any error message
+        return;
+    }
+
+    // Get the current number of rows in the table
+    if (fits_get_num_rows(fptr, &nrows, &status)) {
+        fits_report_error(stderr, status);  // Print any error message
+        return;
+    }
+
+    // insert a single empty row at the end of the output table
+    if (fits_insert_rows(fptr, nrows, 1, &status)) {
+        fits_report_error(stderr, status);  // Print any error message
+        return;
+    }
+
+    // Write the array as a new row in the binary table
+    for (long i = 0; i < n_elements; i++) {
+        if (fits_write_col(fptr, TDOUBLE, i + 1, nrows+1 , 1, 1, &array[i], &status)) {
+            fits_report_error(stderr, status);  // Print any error message
+            return;
+        }
+    }
+
+    // Close the FITS file
+    if (fits_close_file(fptr, &status)) {
+        fits_report_error(stderr, status);  // Print any error message
+        return;
+    }
+
+    printf("Array appended as a new row in the FITS table successfully.\n");
+}
 
 
 void printDateTimeFromEpoch(time_t ts){
@@ -577,6 +669,17 @@ void const callback(char *filein){
          fprintf(fout, "%d\t%lf\n", (5000*i)/(2*N), (5000.*1e6)/(corr.corrtime*256.) * sqrt(P_I*P_Q) * sqrt(fabs(spec[specA].out[i][0]*(-1*spec[specA].out[i][1]))));
       }
       fclose(fout); //close single spectra file
+		    
+		  
+      double array[512];
+      for(int i=0; i<512; i++){
+         array[i] = (5000.*1e6)/(corr.corrtime*256.) * sqrt(P_I*P_Q) * sqrt(fabs(spec[specA].out[i][0]*(-1*spec[specA].out[i][1])));
+      }
+
+
+      // Let's try out CFITSIO!
+      append_to_fits_table("tablefile.fits", array, sizeof(array) / sizeof(array[0]));
+
 
       free(corr.II);    //free all mallocs
       free(corr.QI);
@@ -639,6 +742,10 @@ void const callback(char *filein){
       fflush(stdout);
    
 }
+
+
+
+
 
 
 
