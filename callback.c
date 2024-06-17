@@ -15,7 +15,24 @@
 
 #define PI 3.14159
 #define BUFSIZE 128
-#define DEBUG 1
+#define DEBUG 2
+
+// Function to perform circular shift by -1  [UNUSED]
+// functionally identical to the even/odd IQ[i+1] scheme
+// when IQ[last] is set zero via Hann window
+void circularShiftLeft(float arr[], int size) {
+    if (size <= 1) return; // No shift needed for arrays of size 0 or 1
+
+    float firstElement = arr[0]; // Store the first element
+
+    // Shift all elements one position to the left
+    for (int i = 0; i < size - 1; i++) {
+        arr[i] = arr[i + 1];
+    }
+
+    // Place the first element at the end of the array
+    arr[size - 1] = firstElement;
+}
 
 
 void append_to_fits_table(const char *filename, double *array, long n_elements) {
@@ -248,8 +265,10 @@ void const callback(char *filein){
    float VIlo;
    float VQlo;
 
-   int32_t *Rn;
-   int32_t *Rn2;
+   //int32_t *Rn;
+   //int32_t *Rn2;
+   float *Rn;
+   float *Rn2;
 
    // notification
    printf("File changed: %s\n", filein);
@@ -366,7 +385,7 @@ void const callback(char *filein){
 
       if (corr.Ierr!=0 || corr.Qerr!=0 || \
            corr.Ihi==0 ||  corr.Qhi==0 || corr.Ilo==0 || corr.Qlo==0 || \
-           (corr.corrtime*256.)/(5000.*1000000.)<0.1 )
+           (corr.corrtime*256.)/(5500.*1000000.)<0.1 )
       {
          printf("######################## ERROR ###########################\n");
          printf("#                                                        #\n");
@@ -405,15 +424,19 @@ void const callback(char *filein){
         VQlo = dacV[2];
       }
       
+      if(VIhi==0.){ //Still no values?  bail and don't make spectra
+        //printf("no DAC values, bailing.\n");
+        //break;
+        printf("no DAC values, using defaults.\n");
+	VIhi = 2.1;
+	VQhi = 2.1;
+	VIlo = 1.9;
+	VQlo = 1.9;
+      }
+
       // DEBUG
       if (DEBUG)
          printf("VIhi %.3f\tVQhi %.3f\tVIlo %.3f\tVQlo %.3f\n", VIhi, VQhi, VIlo, VQlo);
-
-      if(VIhi==0.){ //Still no values?  bail and don't make spectra
-        printf("no DAC values, bailing.\n");
-        //break;
-      }
-
 
       // Build the spectra filename and put it in the spectra directory
       char fileout[512] = "";
@@ -438,8 +461,14 @@ void const callback(char *filein){
       corr.QI   = malloc(N*sizeof(int32_t));
       corr.IQ   = malloc(N*sizeof(int32_t));
       corr.QQ   = malloc(N*sizeof(int32_t));
-      Rn  = malloc(2*N*sizeof(int32_t));
-      Rn2 = malloc(4*N*sizeof(int32_t));
+      corr.IIqc = malloc(N*sizeof(float));
+      corr.QIqc = malloc(N*sizeof(float));
+      corr.IQqc = malloc(N*sizeof(float));
+      corr.QQqc = malloc(N*sizeof(float));
+      //Rn  = malloc(2*N*sizeof(int32_t));
+      //Rn2 = malloc(4*N*sizeof(int32_t));
+      Rn  = malloc(2*N*sizeof(float));
+      Rn2 = malloc(4*N*sizeof(float)-1);
 
       // Read lags
       for(int i=0; i<N; i++){
@@ -512,7 +541,7 @@ void const callback(char *filein){
 	    if (DEBUG) {
 	       printf("XY   ");
                for (int i=0; i<10; ++i)
-                  printf("%d ", corr.II[i]);
+                  printf("%f ", (float) corr.II[i]/corr.II[0]);
 	       printf("\n");
 	    }
    
@@ -526,10 +555,17 @@ void const callback(char *filein){
             if (pValueII != NULL && pValueIQ != NULL && pValueQI != NULL && pValueQQ != NULL) {
                // Extract the values from the returned list
                for (int i=0; i<N; ++i){
-                  corr.II[i] = (int32_t) (0.5 * corr.corrtime * PyFloat_AsDouble(PyList_GetItem(pValueII, i)));
-                  corr.IQ[i] = (int32_t) (0.5 * corr.corrtime * PyFloat_AsDouble(PyList_GetItem(pValueIQ, i)));
-                  corr.QI[i] = (int32_t) (0.5 * corr.corrtime * PyFloat_AsDouble(PyList_GetItem(pValueQI, i)));
-                  corr.QQ[i] = (int32_t) (0.5 * corr.corrtime * PyFloat_AsDouble(PyList_GetItem(pValueQQ, i)));
+		  // Fill corr struct with QC int32 values
+                //corr.II[i] = (int32_t) (0.5 * corr.corrtime * PyFloat_AsDouble(PyList_GetItem(pValueII, i)));
+                //corr.IQ[i] = (int32_t) (0.5 * corr.corrtime * PyFloat_AsDouble(PyList_GetItem(pValueIQ, i)));
+                //corr.QI[i] = (int32_t) (0.5 * corr.corrtime * PyFloat_AsDouble(PyList_GetItem(pValueQI, i)));
+                //corr.QQ[i] = (int32_t) (0.5 * corr.corrtime * PyFloat_AsDouble(PyList_GetItem(pValueQQ, i)));
+
+		  // Fill corrqc struct with normalized float32 QC values
+                  corr.IIqc[i] = PyFloat_AsDouble(PyList_GetItem(pValueII, i));
+                  corr.IQqc[i] = PyFloat_AsDouble(PyList_GetItem(pValueIQ, i));
+                  corr.QIqc[i] = PyFloat_AsDouble(PyList_GetItem(pValueQI, i));
+                  corr.QQqc[i] = PyFloat_AsDouble(PyList_GetItem(pValueQQ, i));
                }
 	       //Py_DECREF(pValueII);
             } else{
@@ -541,7 +577,8 @@ void const callback(char *filein){
 	    if (DEBUG) {
 	       printf("XYqc ");
                for (int i=0; i<10; ++i)
-                  printf("%d ", corr.II[i]);
+                //printf("%d ", corr.II[i]);
+                  printf("%f ", corr.IIqc[i]);
 	       printf("\n");
 	       printf("\n");
 	    }
@@ -569,28 +606,50 @@ void const callback(char *filein){
       // GET THE QUANTIZATION CORRECTED LAGS BACK AND USE BELOW !!!
    
 
-
-
-
       // Combine IQ lags into R[]
          for(int i=0; i<(2*N)-1; i++){
-            if(i%2 == 0) Rn[i] = corr.II[i/2] + corr.QQ[i/2];
-            if(i%2 == 1) Rn[i] = corr.IQ[(i-1)/2] + corr.QI[1+(i-1)/2];
+            if(i%2 == 0) Rn[i] = 0.5* (corr.IIqc[i/2] + corr.QQqc[i/2]);           // Even indicies
+            if(i%2 == 1) Rn[i] = 0.5* (corr.IQqc[(i-1)/2] + corr.QIqc[(i-1)/2+1]); // Odd  indicies
          }
-         Rn[(2*N)-1] = corr.IQ[(N-1)/2] + corr.QI[(N-1)/2];
-   
+         int le = 2*N-1; //last element
+         Rn[le] = 0.5* (corr.IQqc[(le-1)/2] + corr.QIqc[(le-1)/2]);         // Last element
+
       // Mirror R[] symmetrically
-         for(int i=0; i<4*N; i++){
-           if(i<(2*N-1)) Rn2[i] = Rn[(2*N-1)-i];
-           else Rn2[i] = Rn[i-(2*N-1)];
+         //for(int i=0; i<4*N; i++){
+         //  if(i<(2*N-1)) Rn2[i] = Rn[(2*N-1)-i];
+         //  else Rn2[i] = Rn[i-(2*N-1)];
+         //}
+         for(int i=0; i<4*N-1; i++){
+           if( i<2*N ) Rn2[2*N-1-i] = Rn[i];
+           else        Rn2[i]       = Rn[i-(2*N-1)];
          }
-   
+
+/*
+      // Try the spectrometer_api_CCv0005.docx routine
+      //
+      // Set QC[0] = 0
+      corr.IQqc[0] = 0.;
+      // circular shift minus one step
+       circularShiftLeft(corr.IQqc, sizeof(corr.IQqc) / sizeof(corr.IQqc[0]));
+
+        for(int i=0; i<2*N; i+=2){
+           Rn[i]   = 0.5 * (corr.IIqc[i/2] + corr.QQqc[i/2]);
+           Rn[i+1] = 0.5 * (corr.IQqc[i/2] + corr.QIqc[i/2]);
+        }
+      // For whatever reason, this doesn't work straight outta the box
+*/
+
+      // Apply Hann window
+         for(int i=0; i<4*N; i++){
+           Rn2[i] = Rn2[i]*0.5*(1-cos(2*PI*i/(4*N)));     //real with Hann window
+         }
+
       // Fill fft struct
          for(int i=0; i<4*N; i++){
-           spec[specA].in[i][0] = Rn2[i]*0.5*(1-cos(2*PI*i/((4*N)-2)));     //real with Hann window
-           spec[specA].in[i][1] = 0.;                                       //imag
+           spec[specA].in[i][0] = Rn2[i];  //real
+           spec[specA].in[i][1] = 0.;      //imag
          }
-   
+
       // Do FFT and print
         fftw_execute(spec[specA].p);
 
@@ -620,7 +679,7 @@ void const callback(char *filein){
 
       // Header information in spectra file
       fprintf(fout, "UNIXTIME\t%" PRIu64 "\n", UNIXTIME);
-      fprintf(fout, "CORRTIME\t%.6f\n", (corr.corrtime*256.)/(5000.*1000000.));
+      fprintf(fout, "CORRTIME\t%.6f\n", (corr.corrtime*256.)/(5500.*1000000.));
       fprintf(fout, "UNIT\t%d\n", UNIT);
       fprintf(fout, "DEV\t%d\n",   DEV); 
       fprintf(fout, "NLAGS\t%d\n", N);
@@ -654,7 +713,7 @@ void const callback(char *filein){
          fprintf(errf, "%u\t", CPU);
          fprintf(errf, "%s\t", prefix);
          fprintf(errf, "%d\t%d\t", UNIT, DEV);
-         fprintf(errf, "%.6f\t", (corr.corrtime*256.)/(5000.*1000000.));
+         fprintf(errf, "%.6f\t", (corr.corrtime*256.)/(5500.*1000000.));
          fprintf(errf, "%u\t", corr.Ierr);
          fprintf(errf, "%u\t", corr.Qerr);
          fprintf(errf, "%u\t", abs((corr.Ihi+corr.Ilo)-corr.II[0]));
@@ -664,18 +723,46 @@ void const callback(char *filein){
 
       fprintf(fout, "ETAQ\t%.3f\n", 1/sqrt(P_I*P_Q));
    
-      //Print in counts per second (assuming 5000 MHz sampling freq)
+      //Print in counts per second (assuming 5500 MHz sampling freq)
       for(int i=0; i<2*N; i++){
-         fprintf(fout, "%d\t%lf\n", (5000*i)/(2*N), (5000.*1e6)/(corr.corrtime*256.) * sqrt(P_I*P_Q) * sqrt(fabs(spec[specA].out[i][0]*(-1*spec[specA].out[i][1]))));
+         fprintf(fout, "%d\t%lf\n", (5500*i)/(2*N), sqrt(P_I*P_Q) * sqrt(pow(spec[specA].out[i][0],2)+pow(spec[specA].out[i][1],2)));
       }
       fclose(fout); //close single spectra file
 		    
+      if (DEBUG>1){
+         fout = fopen("lags.txt", "w");
+         //Save QC lags
+         for(int i=0; i<N; i++){
+          //fprintf(fout, "%d\t%d\t%d\t%d\t%d\n", i, corr.IIqc[i], corr.QQqc[i], corr.IQqc[i], corr.QIqc[i]);
+            fprintf(fout, "%d\t%f\t%f\t%f\t%f\n", i, corr.IIqc[i], corr.QQqc[i], corr.IQqc[i], corr.QIqc[i]);
+         }
+         fclose(fout);
+
+
+         fout = fopen("lagsRn.txt", "w");
+         //Save combined lags
+         for(int i=0; i<2*N; i++){
+          //fprintf(fout, "%d\t%d\n", i,Rn[i]);
+            fprintf(fout, "%d\t%f\n", i,Rn[i]);
+         }
+         fclose(fout);
+
+
+         fout = fopen("lagsRn2.txt", "w");
+         //Save combined mirrored lags
+         for(int i=0; i<4*N; i++){
+          //fprintf(fout, "%d\t%d\n", i,Rn2[i]);
+            fprintf(fout, "%d\t%f\n", i,Rn2[i]);
+         }
+         fclose(fout);
+      }
+
 		  
       // FITS limitation, ncols<=999
       // workaround would be to make a second XTENSION and split up the spectra
       double array[512];
       for(int i=0; i<512; i++){
-         array[i] = (5000.*1e6)/(corr.corrtime*256.) * sqrt(P_I*P_Q) * sqrt(fabs(spec[specA].out[i][0]*(-1*spec[specA].out[i][1])));
+         array[i] = (5500.*1e6)/(corr.corrtime*256.) * sqrt(P_I*P_Q) * sqrt(fabs(spec[specA].out[i][0]*(-1*spec[specA].out[i][1])));
       }
 
 
@@ -713,7 +800,7 @@ void const callback(char *filein){
 		    
       //ouput stats for last spectra in file
       printf("\nUNIXTIME is %" PRIu64 "\n", UNIXTIME);
-      printf("CORRTIME is %.6f\n", (corr.corrtime*256.)/(5000.*1000000.));
+      printf("CORRTIME is %.6f\n", (corr.corrtime*256.)/(5500.*1000000.));
       printDateTimeFromEpoch((long long) UNIXTIME);
       printf("UNIT is %d\n", UNIT);
       printf("DEV  is %d\n",  DEV); 
@@ -746,7 +833,6 @@ void const callback(char *filein){
       fflush(stdout);
    
 }
-
 
 
 

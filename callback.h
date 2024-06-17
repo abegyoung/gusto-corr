@@ -20,6 +20,10 @@ struct corrType
    int32_t *QI;            //32 bit QI lag values
    int32_t *IQ;            //32 bit IQ lag values
    int32_t *QQ;            //32 bit QQ lag values
+   float *IIqc;            //32 bit II lag values (normlized float quantization corrected)
+   float *QIqc;            //32 bit QI lag values (normlized float quantization corrected)
+   float *IQqc;            //32 bit IQ lag values (normlized float quantization corrected)
+   float *QQqc;            //32 bit QQ lag values (normlized float quantization corrected)
 };
 
 
