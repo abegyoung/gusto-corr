@@ -15,7 +15,7 @@
 
 #define PI 3.14159
 #define BUFSIZE 128
-#define DEBUG 2
+#define DEBUG 1
 
 // Function to perform circular shift by -1  [UNUSED]
 // functionally identical to the even/odd IQ[i+1] scheme
@@ -58,29 +58,35 @@ void append_to_fits_table(const char *filename, double *array, long n_elements) 
             }
 
             // Define the column parameters
-            char **ttype = malloc(n_elements * sizeof(char*));
-            char **tform = malloc(n_elements * sizeof(char*));
-            char **tunit = malloc(n_elements * sizeof(char*));
+            //char **ttype = malloc(n_elements * sizeof(char*));
+            //char **tform = malloc(n_elements * sizeof(char*));
+            //char **tunit = malloc(n_elements * sizeof(char*));
+            char *ttype[] = {"spec"};
+            char *tform[] = {"1024D"};
+            char *tunit[] = {" "};
+	    int tfields = 1;
+	    /*
             for (long i = 0; i < n_elements; i++) {
                 ttype[i] = malloc(10 * sizeof(char));
                 snprintf(ttype[i], 10, "Data%ld", i+1);
                 tform[i] = "D";
                 tunit[i] = "";
             }
+	    */
 
             // Create a binary table
-	    //  fits_create_tbl(
-            if (fits_create_tbl(fptr, BINARY_TBL, 0, n_elements, ttype, tform, tunit, extname, &status)) {
+          //if (fits_create_tbl(fptr, BINARY_TBL, 0, n_elements, ttype, tform, tunit, extname, &status)) {
+            if (fits_create_tbl(fptr, BINARY_TBL, 0, tfields   , ttype, tform, tunit, extname, &status)) {
                 fits_report_error(stderr, status);  // Print any error message
                 return;
             }
 
-            for (long i = 0; i < n_elements; i++) {
-                free(ttype[i]);
-            }
-            free(ttype);
-            free(tform);
-            free(tunit);
+            //for (long i = 0; i < n_elements; i++) {
+                //free(ttype[i]);
+            //}
+            //free(ttype);
+            //free(tform);
+            //free(tunit);
         } else {
             fits_report_error(stderr, status);  // Print any error message
             return;
@@ -107,11 +113,17 @@ void append_to_fits_table(const char *filename, double *array, long n_elements) 
     }
 
     // Write the array as a new row in the binary table
+    /*
     for (long i = 0; i < n_elements; i++) {
         if (fits_write_col(fptr, TDOUBLE, i + 1, nrows+1 , 1, 1, &array[i], &status)) {
             fits_report_error(stderr, status);  // Print any error message
             return;
         }
+    }
+    */
+    if (fits_write_col(fptr, TDOUBLE, 1, nrows+1 , 1, 1 * 1024, array, &status)) {
+        fits_report_error(stderr, status);  // Print any error message
+        return;
     }
 
     // Close the FITS file
@@ -385,7 +397,7 @@ void const callback(char *filein){
 
       if (corr.Ierr!=0 || corr.Qerr!=0 || \
            corr.Ihi==0 ||  corr.Qhi==0 || corr.Ilo==0 || corr.Qlo==0 || \
-           (corr.corrtime*256.)/(5500.*1000000.)<0.1 )
+           (corr.corrtime*256.)/(5000.*1000000.)<0.1 )
       {
          printf("######################## ERROR ###########################\n");
          printf("#                                                        #\n");
@@ -679,7 +691,7 @@ void const callback(char *filein){
 
       // Header information in spectra file
       fprintf(fout, "UNIXTIME\t%" PRIu64 "\n", UNIXTIME);
-      fprintf(fout, "CORRTIME\t%.6f\n", (corr.corrtime*256.)/(5500.*1000000.));
+      fprintf(fout, "CORRTIME\t%.6f\n", (corr.corrtime*256.)/(5000.*1000000.));
       fprintf(fout, "UNIT\t%d\n", UNIT);
       fprintf(fout, "DEV\t%d\n",   DEV); 
       fprintf(fout, "NLAGS\t%d\n", N);
@@ -713,7 +725,7 @@ void const callback(char *filein){
          fprintf(errf, "%u\t", CPU);
          fprintf(errf, "%s\t", prefix);
          fprintf(errf, "%d\t%d\t", UNIT, DEV);
-         fprintf(errf, "%.6f\t", (corr.corrtime*256.)/(5500.*1000000.));
+         fprintf(errf, "%.6f\t", (corr.corrtime*256.)/(5000.*1000000.));
          fprintf(errf, "%u\t", corr.Ierr);
          fprintf(errf, "%u\t", corr.Qerr);
          fprintf(errf, "%u\t", abs((corr.Ihi+corr.Ilo)-corr.II[0]));
@@ -723,9 +735,9 @@ void const callback(char *filein){
 
       fprintf(fout, "ETAQ\t%.3f\n", 1/sqrt(P_I*P_Q));
    
-      //Print in counts per second (assuming 5500 MHz sampling freq)
+      //Print in counts per second (assuming 5000 MHz sampling freq)
       for(int i=0; i<2*N; i++){
-         fprintf(fout, "%d\t%lf\n", (5500*i)/(2*N), sqrt(P_I*P_Q) * sqrt(pow(spec[specA].out[i][0],2)+pow(spec[specA].out[i][1],2)));
+         fprintf(fout, "%d\t%lf\n", (5000*i)/(2*N), sqrt(P_I*P_Q) * sqrt(pow(spec[specA].out[i][0],2)+pow(spec[specA].out[i][1],2)));
       }
       fclose(fout); //close single spectra file
 		    
@@ -759,10 +771,10 @@ void const callback(char *filein){
 
 		  
       // FITS limitation, ncols<=999
-      // workaround would be to make a second XTENSION and split up the spectra
-      double array[512];
-      for(int i=0; i<512; i++){
-         array[i] = (5500.*1e6)/(corr.corrtime*256.) * sqrt(P_I*P_Q) * sqrt(fabs(spec[specA].out[i][0]*(-1*spec[specA].out[i][1])));
+      // workaround is to store the entire 1024 array in a single 1*1024 dimension column
+      double array[1024];
+      for(int i=0; i<1024; i++){
+         array[i] = (5000.*1e6)/(corr.corrtime*256.) * sqrt(P_I*P_Q) * sqrt(pow(spec[specA].out[i][0],2)+pow(spec[specA].out[i][1],2));
       }
 
 
@@ -800,7 +812,7 @@ void const callback(char *filein){
 		    
       //ouput stats for last spectra in file
       printf("\nUNIXTIME is %" PRIu64 "\n", UNIXTIME);
-      printf("CORRTIME is %.6f\n", (corr.corrtime*256.)/(5500.*1000000.));
+      printf("CORRTIME is %.6f\n", (corr.corrtime*256.)/(5000.*1000000.));
       printDateTimeFromEpoch((long long) UNIXTIME);
       printf("UNIT is %d\n", UNIT);
       printf("DEV  is %d\n",  DEV); 
