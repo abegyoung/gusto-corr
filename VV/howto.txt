@@ -10,13 +10,16 @@
 #cp lagsRn2.txt VV
 
 
-xpltwin
-awk -F "," '(NR>1){print $1,$2}' spec.csv |plt 0 1 -xa 350 3000 -ya 0 6 -p"(W10,Cred)"
-awk '(NR>24){print $1,12.5*$2}' ACS0_OTF_14766_DEV1_INDX0004_NINT099.txt |plt 0 1 -xa 350 3000 -ya 0 6 -p"(Cblue)" -o
+awk -F "," '(NR>1){print $1,$2}' spec.csv |plt 0 1 -xa 350 3000 -ya 0 6 -p"(W10,Cred)" -lp .8 .99 -le 0 0 "LabView" -T lw > concat
+awk '(NR>24){print $1,12.5*$2}' ACS0_OTF_14766_DEV1_INDX0004_NINT099.txt |plt 0 1 -xa 350 3000 -ya 0 6 -p"(Cblue)" -lp .8 .9 -le 0 0 "corrspec" -s eXt -T lw >> concat
+
+lwcat concat -png >> spec.png
 
 
-xpltwin
-awk -F "," '(NR>1){print $1,$2}' corr.csv |plt 0 1 -xa 0 128 -p"(W10,Cred)"
-cat lagsRn.txt |plt 0 1 -xa 0 128 -p"(Cblue)" -o
+awk -F "," '(NR>1){print $1,$2}' corr.csv |plt 0 1 -xa 0 128 -p"(W10,Cred)" -lp .8 .99 -le 0 0 "LabView" -T lw > concat
+cat lagsRn.txt |plt 0 1 -xa 0 128 -p"(Cblue)" -lp .8 .9 -le 0 0 "corrspec" -s eXt -T lw >> concat
+
+lwcat concat -png >> corr.png
+
 
 
