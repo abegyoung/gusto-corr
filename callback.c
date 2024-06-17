@@ -671,6 +671,8 @@ void const callback(char *filein){
       fclose(fout); //close single spectra file
 		    
 		  
+      // FITS limitation, ncols<=999
+      // workaround would be to make a second XTENSION and split up the spectra
       double array[512];
       for(int i=0; i<512; i++){
          array[i] = (5000.*1e6)/(corr.corrtime*256.) * sqrt(P_I*P_Q) * sqrt(fabs(spec[specA].out[i][0]*(-1*spec[specA].out[i][1])));
@@ -678,7 +680,9 @@ void const callback(char *filein){
 
 
       // Let's try out CFITSIO!
-      append_to_fits_table("tablefile.fits", array, sizeof(array) / sizeof(array[0]));
+      char fitsfile[512] = "";
+      sprintf(fitsfile, "ACS%d_%s_%05d.fits", UNIT-1, prefix, scanID);
+      append_to_fits_table(fitsfile, array, sizeof(array) / sizeof(array[0]));
 
 
       free(corr.II);    //free all mallocs
