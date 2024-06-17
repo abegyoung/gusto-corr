@@ -1,0 +1,22 @@
+# in callback.c:
+# set DEBUG=2
+# set freq 5500 MHz
+
+
+#corrspec VV/ACS3_OTF_14766_0004.dat
+#cp spectra/ACS0_OTF_14766_DEV1_INDX0004_NINT099.txt VV
+#cp lags.txt VV
+#cp lagsRn.txt VV
+#cp lagsRn2.txt VV
+
+
+xpltwin
+awk -F "," '(NR>1){print $1,$2}' spec.csv |plt 0 1 -xa 350 3000 -ya 0 6 -p"(W10,Cred)"
+awk '(NR>24){print $1,12.5*$2}' ACS0_OTF_14766_DEV1_INDX0004_NINT099.txt |plt 0 1 -xa 350 3000 -ya 0 6 -p"(Cblue)" -o
+
+
+xpltwin
+awk -F "," '(NR>1){print $1,$2}' corr.csv |plt 0 1 -xa 0 128 -p"(W10,Cred)"
+cat lagsRn.txt |plt 0 1 -xa 0 128 -p"(Cblue)" -o
+
+
