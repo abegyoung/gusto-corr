@@ -35,12 +35,16 @@ void circularShiftLeft(float arr[], int size) {
 }
 
 
-void append_to_fits_table(const char *filename, double *array, long n_elements) {
+void append_to_fits_table(const char *filename, int32_t *header, double *array) {
+// commented out code below is changing spectra rows to a single 1*1024 column spectra
+// edit 6-17-2022
+// new edits to whack a header on the begining of the row before the data array 6-18-2022
     fitsfile *fptr;  // FITS file pointer
     int status = 0;  // CFITSIO status value MUST be initialized to zero!
     int hdutype;
     long nrows;
     char extname[] = "DATA_TABLE";
+    long n_elements = sizeof(array) / sizeof(array[0]);
 
     // Try to open the FITS file in read/write mode. If it doesn't exist, create a new one.
     if (fits_open_file(&fptr, filename, READWRITE, &status)) {
@@ -61,10 +65,19 @@ void append_to_fits_table(const char *filename, double *array, long n_elements) 
             //char **ttype = malloc(n_elements * sizeof(char*));
             //char **tform = malloc(n_elements * sizeof(char*));
             //char **tunit = malloc(n_elements * sizeof(char*));
-            char *ttype[] = {"spec"};
-            char *tform[] = {"1024D"};
-            char *tunit[] = {" "};
-	    int tfields = 1;
+            char *ttype[] ={"UNIT", "DEV", "NINT", "UNIXTIME", "CPU", "NBYTES", "CORRTIME", "EMPTY", \
+                            "Ihigh", "Qhigh", "Ilow", "Qlow", "Ierr", "Qerr", "spec"};
+
+            char *tform[15];
+	    for(int i=0; i<14; i++)
+	         tform[i] = "1J";
+	    tform[14] = "1024E";
+
+            char *tunit[15];
+	    for(int i=0; i<15; i++)
+	         tunit[i] = " ";
+
+	    int tfields = 15;
 	    /*
             for (long i = 0; i < n_elements; i++) {
                 ttype[i] = malloc(10 * sizeof(char));
@@ -112,8 +125,16 @@ void append_to_fits_table(const char *filename, double *array, long n_elements) 
         return;
     }
 
-    // Write the array as a new row in the binary table
+    // Write the header as two columns
+    //  fits_write_col(fptr,datatype,colnum,firstrow,firstelem,nelements,*array,*status)
+    for (int i=0; i<14; i++){
+        if (fits_write_col(fptr, TINT32BIT, i+1, nrows+1 , 1, 1, &header[i], &status)) {
+            fits_report_error(stderr, status);  // Print any error message
+            return;
+        }
+    }
     /*
+    // Write the array as a new row in the binary table
     for (long i = 0; i < n_elements; i++) {
         if (fits_write_col(fptr, TDOUBLE, i + 1, nrows+1 , 1, 1, &array[i], &status)) {
             fits_report_error(stderr, status);  // Print any error message
@@ -121,7 +142,9 @@ void append_to_fits_table(const char *filename, double *array, long n_elements) 
         }
     }
     */
-    if (fits_write_col(fptr, TDOUBLE, 1, nrows+1 , 1, 1 * 1024, array, &status)) {
+    // Write the spectra as a single 1*1024 column
+    //  fits_write_col(fptr,datatype,colnum,firstrow,firstelem,nelements,*array,*status)
+    if (fits_write_col(fptr, TDOUBLE, 15, nrows+1 , 1, 1 * 1024, array, &status)) {
         fits_report_error(stderr, status);  // Print any error message
         return;
     }
@@ -777,11 +800,11 @@ void const callback(char *filein){
          array[i] = (5000.*1e6)/(corr.corrtime*256.) * sqrt(P_I*P_Q) * sqrt(pow(spec[specA].out[i][0],2)+pow(spec[specA].out[i][1],2));
       }
 
-
       // Let's try out CFITSIO!
       char fitsfile[512] = "";
       sprintf(fitsfile, "ACS%d_%s_%05d.fits", UNIT-1, prefix, scanID);
-      append_to_fits_table(fitsfile, array, sizeof(array) / sizeof(array[0]));
+      if ((corr.corrtime*256.)/(5000.*1000000.)>.9 && (corr.corrtime*256.)/(5000.*1000000.)<1.1)
+         append_to_fits_table(fitsfile, header, array);
 
 
       free(corr.II);    //free all mallocs

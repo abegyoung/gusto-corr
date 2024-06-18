@@ -26,6 +26,11 @@ struct corrType
    float *QQqc;            //32 bit QQ lag values (normlized float quantization corrected)
 };
 
+struct s_table {
+   uint64_t unixtime;
+   double corrtime;
+};
+
 
 
 #ifdef USE_FSWATCH
