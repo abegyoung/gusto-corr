@@ -1,7 +1,7 @@
 KERNEL := $(shell uname -s)
 
 CXX := gcc
-CFLAGS :=
+CFLAGS := -g
 
 ifeq ($(FSFLAG), 0)
   CFLAGS += -DNO_FS

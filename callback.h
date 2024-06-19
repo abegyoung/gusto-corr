@@ -26,10 +26,31 @@ struct corrType
    float *QQqc;            //32 bit QQ lag values (normlized float quantization corrected)
 };
 
-struct s_table {
-   uint64_t unixtime;
-   double corrtime;
-};
+typedef struct s_header {
+	int		unit;
+	int		dev;
+	int		nint;
+	uint64_t	unixtime;
+	int		cpu;
+	int		nbytes;
+	float		corrtime;
+	int		Ihi;
+	int		Qhi;
+	int		Ilo;
+	int		Qlo;
+	int		Ierr;
+	int		Qerr;
+	float		VIhi;
+	float		VQhi;
+	float		VIlo;
+	float		VQlo;
+	int		scanID;
+	float		RA;
+	float		DEC;
+	char		*type;
+	char		*filename;
+	char		*target;
+} s_header;
 
 
 

@@ -16,6 +16,7 @@
 #define PI 3.14159
 #define BUFSIZE 128
 #define DEBUG 1
+#define DOQC 1
 
 // Function to perform circular shift by -1  [UNUSED]
 // functionally identical to the even/odd IQ[i+1] scheme
@@ -35,10 +36,7 @@ void circularShiftLeft(float arr[], int size) {
 }
 
 
-void append_to_fits_table(const char *filename, int32_t *header, double *array) {
-// commented out code below is changing spectra rows to a single 1*1024 column spectra
-// edit 6-17-2022
-// new edits to whack a header on the begining of the row before the data array 6-18-2022
+void append_to_fits_table(const char *filename, struct s_header *fits_header, double *array) {
     fitsfile *fptr;  // FITS file pointer
     int status = 0;  // CFITSIO status value MUST be initialized to zero!
     int hdutype;
@@ -62,44 +60,49 @@ void append_to_fits_table(const char *filename, int32_t *header, double *array) 
             }
 
             // Define the column parameters
-            //char **ttype = malloc(n_elements * sizeof(char*));
-            //char **tform = malloc(n_elements * sizeof(char*));
-            //char **tunit = malloc(n_elements * sizeof(char*));
-            char *ttype[] ={"UNIT", "DEV", "NINT", "UNIXTIME", "CPU", "NBYTES", "CORRTIME", "EMPTY", \
-                            "Ihigh", "Qhigh", "Ilow", "Qlow", "Ierr", "Qerr", "spec"};
+            char *ttype[] ={"UNIT", "DEV", "NINT", "UNIXTIME", "CPU", "NBYTES", "CORRTIME", "Ihigh", "Qhigh", \
+			    "Ilow", "Qlow", "Ierr", "Qerr", "VIhi", "VQhi", "VIlo", "VQlo", "scanID", "RA", "DEC", \
+			    "scan_type", "filename", "target", "spec"};
 
-            char *tform[15];
-	    for(int i=0; i<14; i++)
-	         tform[i] = "1J";
-	    tform[14] = "1024E";
+	    // All header values are signed 32-bit except UNIXTIME which is uint64_t
+            char *tform[24];
+	    tform[0]  = "1J"; //int
+	    tform[1]  = "1J"; //int	
+	    tform[2]  = "1J"; //int
+	    tform[3]  = "1W"; //u64	unixtime
+	    tform[4]  = "1J"; //int
+	    tform[5]  = "1J"; //int
+	    tform[6]  = "1E"; //float	corrtime
+            tform[7]  = "1J"; //int
+            tform[8]  = "1J"; //int
+            tform[9]  = "1J"; //int
+            tform[10] = "1J"; //int
+            tform[11] = "1J"; //int
+            tform[12] = "1J"; //int
+            tform[13] = "1E"; //float	Vdac
+            tform[14] = "1E"; //float	Vdac
+            tform[15] = "1E"; //float	Vdac
+            tform[16] = "1E"; //float	Vdac
+            tform[17] = "1J"; //int	scanID
+            tform[18] = "1E"; //float	RA
+            tform[19] = "1E"; //float	DEC
+	    tform[20] = "6A";
+	    tform[21] = "32A";
+	    tform[22] = "16A";
+	    tform[23] = "1024E";
 
-            char *tunit[15];
-	    for(int i=0; i<15; i++)
+            char *tunit[24];
+	    for(int i=0; i<24; i++)
 	         tunit[i] = " ";
 
-	    int tfields = 15;
-	    /*
-            for (long i = 0; i < n_elements; i++) {
-                ttype[i] = malloc(10 * sizeof(char));
-                snprintf(ttype[i], 10, "Data%ld", i+1);
-                tform[i] = "D";
-                tunit[i] = "";
-            }
-	    */
+	    int tfields = 24;
 
             // Create a binary table
-          //if (fits_create_tbl(fptr, BINARY_TBL, 0, n_elements, ttype, tform, tunit, extname, &status)) {
             if (fits_create_tbl(fptr, BINARY_TBL, 0, tfields   , ttype, tform, tunit, extname, &status)) {
                 fits_report_error(stderr, status);  // Print any error message
                 return;
             }
 
-            //for (long i = 0; i < n_elements; i++) {
-                //free(ttype[i]);
-            //}
-            //free(ttype);
-            //free(tform);
-            //free(tunit);
         } else {
             fits_report_error(stderr, status);  // Print any error message
             return;
@@ -125,26 +128,37 @@ void append_to_fits_table(const char *filename, int32_t *header, double *array) 
         return;
     }
 
-    // Write the header as two columns
-    //  fits_write_col(fptr,datatype,colnum,firstrow,firstelem,nelements,*array,*status)
-    for (int i=0; i<14; i++){
-        if (fits_write_col(fptr, TINT32BIT, i+1, nrows+1 , 1, 1, &header[i], &status)) {
-            fits_report_error(stderr, status);  // Print any error message
-            return;
-        }
-    }
-    /*
-    // Write the array as a new row in the binary table
-    for (long i = 0; i < n_elements; i++) {
-        if (fits_write_col(fptr, TDOUBLE, i + 1, nrows+1 , 1, 1, &array[i], &status)) {
-            fits_report_error(stderr, status);  // Print any error message
-            return;
-        }
-    }
-    */
+    // Write the header data
+    fits_write_col(fptr, TINT32BIT,  1, nrows+1 , 1, 1, &fits_header->unit,  &status);
+    fits_write_col(fptr, TINT32BIT,  2, nrows+1 , 1, 1, &fits_header->dev,  &status);
+    fits_write_col(fptr, TINT32BIT,  3, nrows+1 , 1, 1, &fits_header->nint,  &status);
+    fits_write_col(fptr, TULONGLONG, 4, nrows+1 , 1, 1, &fits_header->unixtime, &status);
+    fits_write_col(fptr, TINT32BIT,  5, nrows+1 , 1, 1, &fits_header->cpu,  &status);
+    fits_write_col(fptr, TINT32BIT,  6, nrows+1 , 1, 1, &fits_header->nbytes,  &status);
+    fits_write_col(fptr, TFLOAT,     7, nrows+1 , 1, 1, &fits_header->corrtime,  &status);
+
+    fits_write_col(fptr, TINT32BIT,  8, nrows+1 , 1, 1, &fits_header->Ihi,  &status);
+    fits_write_col(fptr, TINT32BIT,  9, nrows+1 , 1, 1, &fits_header->Qhi, &status);
+    fits_write_col(fptr, TINT32BIT, 10, nrows+1 , 1, 1, &fits_header->Ilo, &status);
+    fits_write_col(fptr, TINT32BIT, 11, nrows+1 , 1, 1, &fits_header->Qlo, &status);
+    fits_write_col(fptr, TINT32BIT, 12, nrows+1 , 1, 1, &fits_header->Ierr, &status);
+    fits_write_col(fptr, TINT32BIT, 13, nrows+1 , 1, 1, &fits_header->Qerr, &status);
+
+    fits_write_col(fptr, TFLOAT,    14, nrows+1,  1, 1, &fits_header->VIhi, &status);
+    fits_write_col(fptr, TFLOAT,    15, nrows+1,  1, 1, &fits_header->VQhi, &status);
+    fits_write_col(fptr, TFLOAT,    16, nrows+1,  1, 1, &fits_header->VIlo, &status);
+    fits_write_col(fptr, TFLOAT,    17, nrows+1,  1, 1, &fits_header->VQlo, &status);
+									       
+    fits_write_col(fptr, TINT32BIT, 18, nrows+1,  1, 1, &fits_header->scanID, &status);
+    fits_write_col(fptr, TFLOAT,    19, nrows+1,  1, 1, &fits_header->RA, &status);
+    fits_write_col(fptr, TFLOAT,    20, nrows+1,  1, 1, &fits_header->DEC, &status);
+
+    fits_write_col(fptr, TSTRING,   21, nrows+1,  1, 1, &fits_header->type, &status);
+    fits_write_col(fptr, TSTRING,   22, nrows+1,  1, 1, &fits_header->filename, &status);
+    fits_write_col(fptr, TSTRING,   23, nrows+1,  1, 1, &fits_header->target, &status);
+									     
     // Write the spectra as a single 1*1024 column
-    //  fits_write_col(fptr,datatype,colnum,firstrow,firstelem,nelements,*array,*status)
-    if (fits_write_col(fptr, TDOUBLE, 15, nrows+1 , 1, 1 * 1024, array, &status)) {
+    if (fits_write_col(fptr, TDOUBLE, 24, nrows+1 , 1, 1 * 1024, array, &status)) {
         fits_report_error(stderr, status);  // Print any error message
         return;
     }
@@ -155,7 +169,7 @@ void append_to_fits_table(const char *filename, int32_t *header, double *array) 
         return;
     }
 
-    printf("Array appended as a new row in the FITS table successfully.\n");
+    printf("Array appended as a new row in the FITS table successfully.\n\n");
 }
 
 
@@ -258,11 +272,13 @@ void const callback(char *filein){
 
 
    // Arguments to relpower(XmonL, XmonH)
-   pArgs1 = PyTuple_New(2); // for relpower(XmonL, XmonH)
-   pArgsII = PyTuple_New(5); // for       qc(ImonL, ImonH, ImonL, ImonH, corr.II)
-   pArgsIQ = PyTuple_New(5); // for       qc(ImonL, ImonH, QmonL, QmonH, corr.IQ)
-   pArgsQI = PyTuple_New(5); // for       qc(QmonL, QmonH, ImonL, ImonH, corr.IQ)
-   pArgsQQ = PyTuple_New(5); // for       qc(QmonL, QmonH, QmonL, QmonH, corr.QQ)
+   if(DOQC){
+      pArgs1 = PyTuple_New(2); // for relpower(XmonL, XmonH)
+      pArgsII = PyTuple_New(5); // for       qc(ImonL, ImonH, ImonL, ImonH, corr.II)
+      pArgsIQ = PyTuple_New(5); // for       qc(ImonL, ImonH, QmonL, QmonH, corr.IQ)
+      pArgsQI = PyTuple_New(5); // for       qc(QmonL, QmonH, ImonL, ImonH, corr.IQ)
+      pArgsQQ = PyTuple_New(5); // for       qc(QmonL, QmonH, QmonL, QmonH, corr.QQ)
+   }
 
    // End Python initilization
 
@@ -304,6 +320,11 @@ void const callback(char *filein){
    //int32_t *Rn2;
    float *Rn;
    float *Rn2;
+
+   //telemetry objects
+   float RA=0.;
+   float DEC=0.;
+
 
    // notification
    printf("File changed: %s\n", filein);
@@ -379,8 +400,7 @@ void const callback(char *filein){
 
    int32_t header[22];
    const char *header_names[]={"UNIT", "DEV", "NINT", "UNIXTIME", "CPU", "NBYTES", "CORRTIME", "EMPTY", \
-                "Ihigh", "Qhigh", "Ilow", "Qlow", "Ierr", "Qerr", \
-                "EMPTY", "EMPTY","EMPTY","EMPTY","EMPTY","EMPTY","EMPTY","EMPTY"};
+			       "Ihigh", "Qhigh", "Ilow", "Qlow", "Ierr", "Qerr"};
 
 //////////////////////////////  LOOP OVER ALL SPECTRA IN FILE  ///////////////////////////////////
 
@@ -394,7 +414,6 @@ void const callback(char *filein){
             fread(&value1, 4, 1, fp); //Least significant 32 bits
             fread(&value2, 4, 1, fp); //Most significant 32 bis
             UNIXTIME = (((uint64_t)value2 << 32) | value1 ) / 1000.;
-
          }
          else{
             fread(&value, 4, 1, fp);
@@ -406,7 +425,7 @@ void const callback(char *filein){
       UNIT          = header[0];
       DEV           = header[1];
       NINT          = header[2];
-      //UNIXTIME      header[3]; 64 bits
+      //UNIXTIME    = header[3]; 64 bits
       CPU           = header[4];
       NBYTES        = header[5];
       corr.corrtime = header[6];
@@ -430,6 +449,28 @@ void const callback(char *filein){
          printf("######################## ERROR ###########################\n");
          //break;
       }
+
+      //Kind of an orphan here, but it's at least close to the influx DAC voltage call below
+      //go get the RA, DEC from InfluxDB
+      //
+      // NB: There is a 8 hr (28800s) offset in hesperia's UDP database
+      //
+      // TODO:
+      //Also, this is vastly inefficient.  Two calls to influx for RA,DEC.  A single call to "udpPointing" would
+      //return RA AND DEC, but then the influxReturn would have to be rewritten to return two values.
+      curl = init_influx();
+      sprintf(query, "&q=SELECT RA FROM \"udpPointing\" WHERE \"scanID\"=~/%d/ AND time>\%" PRIu64 "000000000 AND time<\%" PRIu64 "000000000", \
+		      scanID, UNIXTIME-1-28800, UNIXTIME+1-28800);
+      influxReturn = influxWorker(curl, query);
+      RA = influxReturn.value;
+     
+      curl = init_influx();
+      sprintf(query, "&q=SELECT DEC FROM \"udpPointing\" WHERE \"scanID\"=~/%d/ AND time>\%" PRIu64 "000000000 AND time<\%" PRIu64 "000000000", \
+		      scanID, UNIXTIME-1-28800, UNIXTIME+1-28800);
+      influxReturn = influxWorker(curl, query);
+      DEC = influxReturn.value;
+      printf("======== RA=%.3f DEC=%.3f ==========\n", RA, DEC);
+
 
       // Initialize the Influx DB
       // read 4 correlator DAC voltages
@@ -472,6 +513,8 @@ void const callback(char *filein){
       // DEBUG
       if (DEBUG)
          printf("VIhi %.3f\tVQhi %.3f\tVIlo %.3f\tVQlo %.3f\n", VIhi, VQhi, VIlo, VQlo);
+
+      
 
       // Build the spectra filename and put it in the spectra directory
       char fileout[512] = "";
@@ -519,12 +562,11 @@ void const callback(char *filein){
 
 
 
-
       // PASS THE UNCORRECTED LAGS INTO PYTHON FOR QUANTIZATION CORRECTION HERE !!!
        
 
 
-
+if(DOQC){
       // create a Python list and fill it with normalized uncorrected correlation coefficients
       // Check for errors
       if (pModule != NULL) {
@@ -612,9 +654,7 @@ void const callback(char *filein){
 	    if (DEBUG) {
 	       printf("XYqc ");
                for (int i=0; i<10; ++i)
-                //printf("%d ", corr.II[i]);
                   printf("%f ", corr.IIqc[i]);
-	       printf("\n");
 	       printf("\n");
 	    }
 
@@ -633,6 +673,16 @@ void const callback(char *filein){
 	 PyErr_Print();
 	 fprintf(stderr, "Failed to load the Python module\n");
       }
+}
+else
+{
+   for(int i=0; i<N; i++){
+	corr.IIqc[i] = corr.II[i]/corr.II[0];
+	corr.IQqc[i] = corr.IQ[i]/corr.IQ[0];
+	corr.QIqc[i] = corr.QI[i]/corr.QI[0];
+	corr.QQqc[i] = corr.QQ[i]/corr.QQ[0];
+   }
+}
 
 
 
@@ -650,17 +700,13 @@ void const callback(char *filein){
          Rn[le] = 0.5* (corr.IQqc[(le-1)/2] + corr.QIqc[(le-1)/2]);         // Last element
 
       // Mirror R[] symmetrically
-         //for(int i=0; i<4*N; i++){
-         //  if(i<(2*N-1)) Rn2[i] = Rn[(2*N-1)-i];
-         //  else Rn2[i] = Rn[i-(2*N-1)];
-         //}
          for(int i=0; i<4*N-1; i++){
            if( i<2*N ) Rn2[2*N-1-i] = Rn[i];
            else        Rn2[i]       = Rn[i-(2*N-1)];
          }
 
 /*
-      // Try the spectrometer_api_CCv0005.docx routine
+      // Try the Omnisys ICD spectrometer_api_CCv0005.docx routine
       //
       // Set QC[0] = 0
       corr.IQqc[0] = 0.;
@@ -698,6 +744,7 @@ void const callback(char *filein){
       // to the relpower function from the Omnisys DLL to high precision. When  validated
       // over a range of power levels (HOT, OTF, REF) the two give equal results up to a
       // factor of 2.   (The factor 1.8197 likely comes from the erfinv for a 3-level ACS
+if(DOQC){
       PyTuple_SetItem(pArgs1, 0, PyFloat_FromDouble((double)corr.Ilo/corr.corrtime));
       PyTuple_SetItem(pArgs1, 1, PyFloat_FromDouble((double)corr.Ihi/corr.corrtime));
       pValue = PyObject_CallObject(pFunc1, pArgs1);
@@ -711,6 +758,7 @@ void const callback(char *filein){
       // Output the relative power comparison
       if (DEBUG)
          printf("Ipwr is %f\tQpwr is %f\tP_I is %f\tP_Q is %f\n", Ipwr, Qpwr, P_I, P_Q);
+}
 
       // Header information in spectra file
       fprintf(fout, "UNIXTIME\t%" PRIu64 "\n", UNIXTIME);
@@ -768,7 +816,6 @@ void const callback(char *filein){
          fout = fopen("lags.txt", "w");
          //Save QC lags
          for(int i=0; i<N; i++){
-          //fprintf(fout, "%d\t%d\t%d\t%d\t%d\n", i, corr.IIqc[i], corr.QQqc[i], corr.IQqc[i], corr.QIqc[i]);
             fprintf(fout, "%d\t%f\t%f\t%f\t%f\n", i, corr.IIqc[i], corr.QQqc[i], corr.IQqc[i], corr.QIqc[i]);
          }
          fclose(fout);
@@ -777,7 +824,6 @@ void const callback(char *filein){
          fout = fopen("lagsRn.txt", "w");
          //Save combined lags
          for(int i=0; i<2*N; i++){
-          //fprintf(fout, "%d\t%d\n", i,Rn[i]);
             fprintf(fout, "%d\t%f\n", i,Rn[i]);
          }
          fclose(fout);
@@ -786,15 +832,50 @@ void const callback(char *filein){
          fout = fopen("lagsRn2.txt", "w");
          //Save combined mirrored lags
          for(int i=0; i<4*N; i++){
-          //fprintf(fout, "%d\t%d\n", i,Rn2[i]);
             fprintf(fout, "%d\t%f\n", i,Rn2[i]);
          }
          fclose(fout);
       }
 
-		  
-      // FITS limitation, ncols<=999
-      // workaround is to store the entire 1024 array in a single 1*1024 dimension column
+      // Construct the FITS HEADER
+      
+
+      s_header *fits_header = (s_header *)malloc(sizeof(s_header));
+      fits_header->type     = (char *)malloc(6);
+      fits_header->filename = (char *)malloc(32);
+      fits_header->target   = (char *)malloc(16);
+
+      fits_header->unit     = UNIT;
+      fits_header->dev      = DEV;
+      fits_header->nint     = NINT;
+      fits_header->unixtime = UNIXTIME;
+      fits_header->cpu      = CPU;
+      fits_header->nbytes   = NBYTES;
+      fits_header->corrtime = (corr.corrtime*256.)/(5000.*1000000.);
+
+      fits_header->Ihi      = corr.Ihi;
+      fits_header->Qhi      = corr.Qhi;
+      fits_header->Ilo      = corr.Ilo;
+      fits_header->Qlo      = corr.Qlo;
+      fits_header->Ierr     = corr.Ierr;
+      fits_header->Qerr     = corr.Qerr;
+
+      fits_header->VIhi     = VIhi;
+      fits_header->VQhi     = VQhi;
+      fits_header->VIlo     = VIlo;
+      fits_header->VQlo     = VQlo;
+
+      fits_header->scanID   = scanID;
+
+      fits_header->RA       = RA;
+      fits_header->DEC      = DEC;
+
+      fits_header->type     = prefix;
+      fits_header->filename = "ACS3_OTF_14755_0000.dat";
+      fits_header->target   = "TARGETNAME";
+
+      
+      // Construct the FITS DATA
       double array[1024];
       for(int i=0; i<1024; i++){
          array[i] = (5000.*1e6)/(corr.corrtime*256.) * sqrt(P_I*P_Q) * sqrt(pow(spec[specA].out[i][0],2)+pow(spec[specA].out[i][1],2));
@@ -803,17 +884,25 @@ void const callback(char *filein){
       // Let's try out CFITSIO!
       char fitsfile[512] = "";
       sprintf(fitsfile, "ACS%d_%s_%05d.fits", UNIT-1, prefix, scanID);
-      if ((corr.corrtime*256.)/(5000.*1000000.)>.9 && (corr.corrtime*256.)/(5000.*1000000.)<1.1)
-         append_to_fits_table(fitsfile, header, array);
-
+      append_to_fits_table(fitsfile, fits_header, array);
 
       free(corr.II);    //free all mallocs
       free(corr.QI);
       free(corr.IQ);
       free(corr.QQ);
+      free(corr.IIqc);    //free all mallocs
+      free(corr.QIqc);
+      free(corr.IQqc);
+      free(corr.QQqc);
       free(Rn);
       free(Rn2);
+
+      free(fits_header);
+
+
    }
+free(query);
+free(prefix);
 
 
 //Py_INCREF(pArgs1);
