@@ -5,58 +5,151 @@
 #include "corrspec.h"
 #include "influx.h"
 
+#define MAXLENGTH 16
+
 //the returned data
 //double influx_return;
-struct influxStruct influxReturn;
+influxStruct *influxReturn=NULL;
 
-// Callback function to handle the response from the InfluxDB server
-struct influxStruct write_callback(void *contents, size_t size, size_t nmemb, void *userp) {
+int countString(const char *haystack, const char *needle){
+	int count = 0;
+	const char *tmp = haystack;
+	while(tmp = strstr(tmp, needle))
+	{
+		count++;
+		tmp++;
+	}
+	return count;
+}
 
-    char *token;
-    int position = 0;
-    char time[64]="";
-    char ID[12]="";
-    int scanID;
-    float value;
-    size_t realsize = size * nmemb;
-
-
-    token = strtok(contents, ",");
-
-    // Parse the InfluxDB return string
-    while (token != NULL ) {
-        token = strtok(NULL, ",");
-
-        if (position == 4)     //get time string from influxdb return
-            strncpy(time, token+12, 23);
-
-        if (position == 5){    //get scanID from influxdb return
-            strncpy(ID, token+1, strlen(token)-1);
-            scanID = atoi(ID);
+// extract substring starting from nth occurence of start_str to end_char
+void extract_substring(const char *source, const char *start_str, char end_char, int occurrence, char *result) {
+    const char *start_pos = source;
+    for (int i = 0; i < occurrence; i++) {
+        start_pos = strstr(start_pos, start_str);
+        if (start_pos == NULL) {
+            // nth occurrence of starting string not found
+            result[0] = '\0';
+            return;
         }
-
-        if (position == 6)     //get value string from influxdb return
-            value = atof(token);
-        position++;
+        start_pos += strlen(start_str); // Move to the end of the current occurrence
     }
 
-    //printf("value = %.3f\n", value);
-    //printf("scanID = %d\n", scanID);
-    //printf("time = %s\n", time);
+    char *end_pos = strchr(start_pos, end_char);
+    if (end_pos == NULL) {
+        // Ending character not found
+        result[0] = '\0';
+        return;
+    }
 
-    influxReturn.value  = value;
-    influxReturn.scanID = scanID;
+    size_t length = end_pos - start_pos;
+    strncpy(result, start_pos, length);
+    result[length] = '\0'; // Null-terminate the result
 
-    //return realsize;
-    //return influx_return;
-    return influxReturn;
+}
+
+
+
+// Callback function to handle the response from the InfluxDB server
+size_t write_callback(char *contents, size_t size, size_t nmemb, void *userp) {
+
+    size_t realsize = size * nmemb;
+
+    int time_indx = 0;
+    int scan_indx = 0;
+    int col_indx = 0;
+    int pos = 0;	//token count
+    char *token;
+    char ID[32]="";
+    char data[32]="";
+
+    // vars to extract number of columns substring
+    const char *start_str = "\"columns\":\[";
+    const char *start_str2 = "\"values\":\[\[";
+    char end_char = ']';
+    char result[256];
+
+    int nmeas = 0;	// num measurements
+			// ACS3_DEV4_VQlo, ACS3_DEV4_VQhi, ACS3_DEV4_VIlo, ACS3_DEV4_VIhi  would be meas=4
+			// udpPointing would be meas=1
+			// HK_TEMP11 would be meas=1
+			
+    int ncols = 0;	// num influx columns
+			// "time", "DEC", "RA", "scanID"
+			// "time", "temp"
+			// "time", "scanID", "volt"
+			
+    //get the number of measurements
+    nmeas = countString(contents, "name");
+
+    //get the number of columns
+    extract_substring(contents, start_str, end_char, 1, result);
+    ncols = countString(result, ",") + 1;
+
+    // find the dynamically reported time and scanID columns
+    token = strtok(result, ",");
+    while (token != NULL ){
+
+	memset(ID, '\0', sizeof(ID));
+        strncpy(ID, token+1, strlen(token)-2);
+
+        if(!strcmp(ID, "time"))
+            time_indx = pos;
+
+        if(!strcmp(ID, "scanID"))
+            scan_indx = pos;
+
+        token = strtok(NULL, ",");
+        pos++;
+    }
+
+
+    // dynamically allocate structure
+    influxReturn = malloc(sizeof(*influxReturn));
+    influxReturn->length = nmeas * (ncols-2);
+    influxReturn->value = (float *)malloc(nmeas*(ncols-2) * sizeof(float));
+
+
+    // Parse the InfluxDB return string 
+    int data_indx=0;
+    for(int i=0; i<nmeas; i++){
+        extract_substring(contents, start_str2, end_char, i+1, result);
+	printf("\n\n%s\n\n", result);
+
+        pos=0;
+        token = strtok(result, ",");
+        while (token != NULL ){
+
+	        if(pos == time_indx){
+                    printf("time is %s\n", token);
+	        }
+    
+	        else if(pos == scan_indx){
+	                memset(ID, '\0', sizeof(ID));
+		        strncpy(ID, token+1, strlen(token)-2);
+		        influxReturn->scanID = atof(ID);
+		        printf("scanID string = %s\n", ID);
+	        }
+
+	        else{
+		        strncpy(data, token, strlen(token));
+		        influxReturn->value[data_indx] = atof(data);
+		        printf("data string = %s\n", data);
+		        data_indx++;
+	        }
+	        pos++;
+                token = strtok(NULL, ",");
+        }
+    }
+
+    return realsize;
 
 }
 
 // worker for the Influx DB query
 // Takes: curl handle
 // Operates: makes the function callback( )
-struct influxStruct influxWorker(CURL *curl, char *query)
+influxStruct* influxWorker(CURL *curl, char *query)
 {
 
     CURLcode res;
@@ -73,8 +166,6 @@ struct influxStruct influxWorker(CURL *curl, char *query)
 
         // Make the HTTP POST request
         res = curl_easy_perform(curl);
-
-
 
     }
 

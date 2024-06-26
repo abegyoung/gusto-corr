@@ -47,6 +47,7 @@ typedef struct s_header {
 	int		scanID;
 	float		RA;
 	float		DEC;
+	float		THOT;
 	char		*type;
 	char		*filename;
 	char		*target;

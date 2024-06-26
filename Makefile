@@ -3,6 +3,8 @@ KERNEL := $(shell uname -s)
 CXX := gcc
 CFLAGS := -g
 
+FSFLAG=0
+
 ifeq ($(FSFLAG), 0)
   CFLAGS += -DNO_FS
 endif
@@ -26,7 +28,7 @@ else
 
 endif
 
-corrspec: corrspec.c corrspec.h callback.c callback.h
+corrspec: corrspec.c corrspec.h callback.c callback.h influx.c influx.h
 	$(CXX) -c callback.c $(INCLUDES) $(CFLAGS) $(LIBS)
 	$(CXX) -c corrspec.c $(INCLUDES) $(CFLAGS) $(LIBS)
 	$(CXX) -c influx.c $(INCLUDES) $(CFLAGS) $(LIBS)

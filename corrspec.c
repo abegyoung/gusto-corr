@@ -14,12 +14,42 @@
 #include <glob.h>
 #include <Python.h>
 
+#include <signal.h>
+#include <errno.h>
+#include <sys/mman.h>
+
+#define handle_error(msg) \
+	do { perror(msg); exit(EXIT_FAILURE); } while (0)
 
 struct Spectrum spec[4];
 PyObject *pName, *pModule;
 PyObject *pFunc1, *pFunc2;
 
+static void handler(int sig, siginfo_t *si, void *unused)
+{
+   printf("Got SIGSEGV at address: 0x%lx\n", (long) si->si_addr);
+   printf("Gracefully exiting\n");
+
+   // close wenv connection
+   Py_DECREF(pFunc1);
+   Py_DECREF(pFunc2);
+   Py_DECREF(pModule);
+   Py_DECREF(pName);
+   Py_Finalize();
+
+}
+
 int main(int argc, char **argv) {
+
+/*
+   // Set up SIGSEGV handler
+   struct sigaction sa;
+   sa.sa_flags = SA_SIGINFO;
+   sigemptyset(&sa.sa_mask);
+   sa.sa_sigaction = handler;
+   if (sigaction(SIGSEGV, &sa, NULL) == -1)
+	   handle_error("sigaction");
+*/
 
    // Set up the Python C Extensions here (Used in callback() function in callback.c
    putenv("PYTHONPATH=./");

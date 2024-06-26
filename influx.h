@@ -8,23 +8,26 @@
 // global variable to be returned by worker from callback fn
 
 // struct for the influxDB worker to return
-struct influxStruct
+typedef struct 
 {
-  float    value;
+  size_t   length;
+  char     time[64];
   int16_t  scanID;
-  uint64_t time;
-};
-extern struct influxStruct influxReturn;
+  float    *value;
+} influxStruct;
+extern influxStruct *influxReturn;
 
 
 // InfluxDB parameters
 #define INFLUXDB_URL "http://localhost:8086/query?&db=gustoDBlp"
 
 // Callback function to handle the response from the InfluxDB server
-struct influxStruct write_callback(void *contents, size_t size, size_t nmemb, void *userp);
+size_t write_callback(char *contents, size_t size, size_t nmemb, void *userp);
 
 // Initialization function to connect to the Influx DB.
 // Returns: The curl handle to pass to the handler function
 CURL *init_influx();
 
-struct influxStruct influxWorker(CURL *curl, char *query);
+influxStruct* influxWorker(CURL *curl, char *query);
+
+void freeinfluxStruct(influxStruct *influxReturn);
