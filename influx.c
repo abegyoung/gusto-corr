@@ -23,8 +23,8 @@ int countString(const char *haystack, const char *needle){
 }
 
 // extract substring starting from nth occurence of start_str to end_char
-void extract_substring(const char *source, const char *start_str, char end_char, int occurrence, char *result) {
-    const char *start_pos = source;
+void extract_substring(char *source, char *start_str, char end_char, int occurrence, char *result) {
+    char *start_pos = source;
     for (int i = 0; i < occurrence; i++) {
         start_pos = strstr(start_pos, start_str);
         if (start_pos == NULL) {
@@ -64,8 +64,8 @@ size_t write_callback(char *contents, size_t size, size_t nmemb, void *userp) {
     char data[32]="";
 
     // vars to extract number of columns substring
-    const char *start_str = "\"columns\":\[";
-    const char *start_str2 = "\"values\":\[\[";
+    char *start_str = "\"columns\":\[";
+    char *start_str2 = "\"values\":\[\[";
     char end_char = ']';
     char result[256];
 
@@ -114,27 +114,26 @@ size_t write_callback(char *contents, size_t size, size_t nmemb, void *userp) {
     int data_indx=0;
     for(int i=0; i<nmeas; i++){
         extract_substring(contents, start_str2, end_char, i+1, result);
-	printf("\n\n%s\n\n", result);
 
         pos=0;
         token = strtok(result, ",");
         while (token != NULL ){
 
 	        if(pos == time_indx){
-                    printf("time is %s\n", token);
+                    //printf("time is %s\n", token);
 	        }
     
 	        else if(pos == scan_indx){
 	                memset(ID, '\0', sizeof(ID));
 		        strncpy(ID, token+1, strlen(token)-2);
 		        influxReturn->scanID = atof(ID);
-		        printf("scanID string = %s\n", ID);
+		        //printf("scanID string = %s\n", ID);
 	        }
 
 	        else{
 		        strncpy(data, token, strlen(token));
 		        influxReturn->value[data_indx] = atof(data);
-		        printf("data string = %s\n", data);
+		        //printf("data string = %s\n", data);
 		        data_indx++;
 	        }
 	        pos++;
@@ -145,6 +144,13 @@ size_t write_callback(char *contents, size_t size, size_t nmemb, void *userp) {
     return realsize;
 
 }
+
+
+void freeinfluxStruct(influxStruct *influxReturn) {
+   free(influxReturn->value);
+   free(influxReturn);
+}
+
 
 // worker for the Influx DB query
 // Takes: curl handle

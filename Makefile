@@ -1,7 +1,7 @@
 KERNEL := $(shell uname -s)
 
 CXX := gcc
-CFLAGS := -g
+CFLAGS := -g -pg
 
 FSFLAG=0
 

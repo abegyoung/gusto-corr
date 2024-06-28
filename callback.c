@@ -18,6 +18,7 @@
 #define DEBUG 1
 #define DOQC 1
 
+
 // Function to perform circular shift by -1  [UNUSED]
 // functionally identical to the even/odd IQ[i+1] scheme
 // when IQ[last] is set zero via Hann window
@@ -174,7 +175,6 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
     printf("Array appended as a new row in the FITS table successfully.\n\n");
 }
 
-
 void printDateTimeFromEpoch(time_t ts){
 
         struct tm *tm = gmtime(&ts);
@@ -204,82 +204,49 @@ char nthdigit(int x, int n)
 // Callback function to process the file
 // Function definition changes for FSWATCH or INOTIFY or NO_FS
 #ifdef USE_FSWATCH
-
 void const callback(const fsw_cevent *events,const unsigned int event_num, void *data){
 
    char *filein= events->path;
-
    // for fswatch, get just the filename, not path
    char *name;
    char *last = strrchr(filein, '/');
    if (last != NULL) {
       sprintf(name, "%s", last+1);
    }
-
 #endif
 
 #if USE_INOTIFY
-
 void const callback(struct inotify_event *event, const char *directory){
 
    char filein[128];
    snprintf(filein, 128, "%s/%s", directory, event->name);
-
    char *name = event->name;
-
 #endif
 
 #ifdef NO_FS
-
 void const callback(char *filein){
-
    char *name = filein;
-
 #endif
 
-   char errfile[64] = "err.log";
+   //char errfile[64] = "err.log";
 
-   // moved to main()
-   // Initialize the Python interpreter
-   //Py_Initialize();
+   // Python objects for refpower
+   // pArgs 
+   PyObject *pArgs;
+   PyObject *pValue;
 
-   // moved to main()
-   // common to both functions
-   //PyObject *pName, *pModule;
-   
-   // for relpower
-   //PyObject *pFunc1;
-   PyObject *pArgs1, *pValue;
-
-   // for qc
-   //PyObject *pFunc2;
+   // Python objects for quantization correction
    PyObject *pArgsII, *pArgsQI, *pArgsIQ, *pArgsQQ; 
    PyObject *pListII, *pListQI, *pListIQ, *pListQQ; 
    PyObject *pValueII, *pValueQI, *pValueIQ, *pValueQQ; 
 
-   // moved to main()
-   // Build the name object for both functions from callQC.py file
-   //pName = PyUnicode_FromString("callQC");
-
-   // moved to main()
-   // Load the module object
-   //pModule = PyImport_Import(pName);
-
-   // moved to main()
-   // Get the two functions from the module
-   //if (pModule != NULL){
-   //   pFunc1 = PyObject_GetAttrString(pModule, "relpower");
-   //   pFunc2 = PyObject_GetAttrString(pModule, "qc");
-   //}
-
-
    // Arguments to relpower(XmonL, XmonH)
    if(DOQC){
-      pArgs1 = PyTuple_New(2); // for relpower(XmonL, XmonH)
-      pArgsII = PyTuple_New(5); // for       qc(ImonL, ImonH, ImonL, ImonH, corr.II)
-      pArgsIQ = PyTuple_New(5); // for       qc(ImonL, ImonH, QmonL, QmonH, corr.IQ)
-      pArgsQI = PyTuple_New(5); // for       qc(QmonL, QmonH, ImonL, ImonH, corr.IQ)
-      pArgsQQ = PyTuple_New(5); // for       qc(QmonL, QmonH, QmonL, QmonH, corr.QQ)
+      pArgs   = PyTuple_New(2); // for relpower(XmonL, XmonH)
+      pArgsII = PyTuple_New(5); // for qc(ImonL, ImonH, ImonL, ImonH, corr.II)
+      pArgsIQ = PyTuple_New(5); // for qc(ImonL, ImonH, QmonL, QmonH, corr.IQ)
+      pArgsQI = PyTuple_New(5); // for qc(QmonL, QmonH, ImonL, ImonH, corr.IQ)
+      pArgsQQ = PyTuple_New(5); // for qc(QmonL, QmonH, QmonL, QmonH, corr.QQ)
    }
 
    // End Python initilization
@@ -298,8 +265,8 @@ void const callback(char *filein){
    //correlator file objectsI
    int N;
    FILE *fp;
-   FILE *fout;
-   FILE *errf;
+   //FILE *fout;
+   //FILE *errf;
    double P_I;
    double P_Q;
    double Ipwr;
@@ -332,10 +299,9 @@ void const callback(char *filein){
    fp = fopen(filein, "r");
 
    // Find file type from filename
-   // TODO: implement the UNKNOWN filetype and use tokens
    int i=0;
    char *ptr = NULL;
-   char *prefix=malloc(6*sizeof(char));;
+   char *prefix=malloc(4*sizeof(char));;
    const char *prefix_names[]={"SRC", "REF", "OTF", "HOT", "COLD", "FOC", "UNK"};
    while ( ptr==NULL ){
       ptr = strstr(filein, prefix_names[i]);
@@ -347,8 +313,9 @@ void const callback(char *filein){
    printf("The type is %s\n", prefix);
 
    // Find scanID from filename
-   // TODO: combine the file type and scanID from filename 
    int scanID = -1;
+   int CALID = -1;
+   int THOTID = -1;
    int dataN;
    char *token;
    int position = 0;
@@ -356,25 +323,25 @@ void const callback(char *filein){
     // Use strtok to tokenize the filename using underscores as delimiters
     token = strtok(filein, "_");
 
-    // Iterate through the tokens until reaching the 2nd position
-    while (token != NULL ) {
-        token = strtok(NULL, "_");
+   // Iterate through the tokens until reaching the 2nd position
+   while (token != NULL ) {
+      token = strtok(NULL, "_");
 
-        if (position == 1 ) {      //get scanID
-            if(atoi(token)>0) scanID = atoi(token);
-            printf("The scanID is: %d\n", scanID);
-        }
+      if (position == 1 ) {      //get scanID
+         if(atoi(token)>0) scanID = atoi(token);
+         printf("The scanID is: %d\n", scanID);
+      }
 
-        if (position == 2 ) {      //get scanID
-            dataN = atoi(token);
-            printf("The data file index # is: %05d\n", dataN);
-        }
+      if (position == 2 ) {      //get scanID
+         dataN = atoi(token);
+         printf("The data file index # is: %05d\n", dataN);
+      }
 
-        position++;
-    }
+      position++;
+   }
 
 
-   // Build a regex with the range of the previous 8 scanID #s
+   // Build a regex with the range of the previous 8 scanID #s for Correlator DACs
    char scanIDregex[512];
    int pos = 0;
    pos += sprintf(&scanIDregex[pos], "(");
@@ -384,6 +351,16 @@ void const callback(char *filein){
    pos += sprintf(&scanIDregex[pos], "%d)", scanID-30);
    printf("%s\n", scanIDregex);
 
+
+   // Build a regex with the range of the previous 2 and next 2 scanID #s for HK_TEMP11
+   char HOTregex[512];
+   pos = 0;
+   pos += sprintf(&HOTregex[pos], "(");
+   for (int k=0; k<4; k++){
+      pos += sprintf(&HOTregex[pos], "%d|", scanID-k+2);
+   }
+   pos += sprintf(&HOTregex[pos], "%d)", scanID-2);
+   printf("%s\n", HOTregex);
 
 
    int32_t value;
@@ -400,15 +377,17 @@ void const callback(char *filein){
    printf("File has %.1f spectra\n", (float)sz/bps);
 
    int32_t header[22];
-   const char *header_names[]={"UNIT", "DEV", "NINT", "UNIXTIME", "CPU", "NBYTES", "CORRTIME", "EMPTY", \
-			       "Ihigh", "Qhigh", "Ilow", "Qlow", "Ierr", "Qerr"};
+   const char *header_names[]={"UNIT", "DEV", "NINT", "UNIXTIME", "CPU", "NBYTES", "CORRTIME", \
+			       "EMPTY", "Ihigh", "Qhigh", "Ilow", "Qlow", "Ierr", "Qerr"};
 
 //////////////////////////////  LOOP OVER ALL SPECTRA IN FILE  ///////////////////////////////////
 
-   int j;
 
-   for(j=0; j<(int)sz/bps; j++)
+   // Start at beginning of data file
+   for(int j=0; j<(int)sz/bps; j++)
    {
+   printf("The type is %s\n", prefix);
+      // Loop over header location
       for(int i=0; i<22; i++){
          if(i==3){
             //UNIXTIME is 64 bits
@@ -421,6 +400,7 @@ void const callback(char *filein){
          }
          header[i] = (value);
       }
+      // data file *fp is now at start of lag data
 
       // fill variables from header array
       UNIT          = header[0];
@@ -451,33 +431,43 @@ void const callback(char *filein){
          //break;
       }
 
-      // RA, DEC from InfluxDB
+      // RA, DEC from InfluxDB 0.5s ahead or behind time
       curl = init_influx();
       sprintf(query, "&q=SELECT *   FROM \"udpPointing\" WHERE \"scanID\"=~/%d/ AND time>\%" PRIu64 "500000000 AND time<\%" PRIu64 "500000000", scanID, UNIXTIME-1-28800, UNIXTIME+0-28800);
-      printf("%s\n", query);
       influxReturn = influxWorker(curl, query);
       DEC = influxReturn->value[0];
       RA  = influxReturn->value[1];
+
+      // Free the allocated memory from udpPointing
+      freeinfluxStruct(influxReturn);
+
      
-      // Most recent HOT temperature
+      // Most recent HOT temperature from current scanID or ahead/behind 2 scanIDs
       curl = init_influx();
       sprintf(query, "&q=SELECT temp FROM \"HK_TEMP11\"   WHERE \"scanID\"=~/%d/ AND time>\%" PRIu64 "000000000 AND time<\%" PRIu64 "000000000", scanID, UNIXTIME-1-1000, UNIXTIME+1+1000);
-      sprintf(query, "&q=SELECT * FROM \"HK_TEMP11\"   WHERE \"scanID\"=~/%d/", scanID);
-      printf("%s\n", query);
+      sprintf(query, "&q=SELECT * FROM \"HK_TEMP11\"   WHERE \"scanID\"=~/%s/ ORDER BY time DESC LIMIT 10", HOTregex);
       influxReturn = influxWorker(curl, query);
       THOT = influxReturn->value[0] + 273.13;
+      THOTID = influxReturn->scanID;
 
-      printf("======== RA=%.3f DEC=%.3f THOT=%.1f==========\n", RA, DEC, THOT);
+      printf("======== RA=%.3f DEC=%.3f THOT=%.1f==========\n", RA, DEC, THOT);  //Info print
 
-      // Single SELECT for CORRELATOR DACS
+      // Free the allocated memory from HK_TEMP11
+      freeinfluxStruct(influxReturn);
+
+
+      // Single SELECT for CORRELATOR DACS from current or nearest previous Correlator Cal
       curl = init_influx();
       sprintf(query, "&q=SELECT * FROM /^ACS%d_DEV%d_*/ WHERE \"scanID\"=~/%s/ ORDER BY time DESC LIMIT 10", UNIT-1, DEV, scanIDregex);
-      printf("%s\n", query);
       influxReturn = influxWorker(curl, query);
-      dacV[0] = influxReturn->value[3]; //VIhi
+      dacV[0] = influxReturn->value[3]; //VIhi  Order is reverse alphabetical from InfluxDB SELECT
       dacV[1] = influxReturn->value[1]; //VQhi
       dacV[2] = influxReturn->value[2]; //VIlo
       dacV[3] = influxReturn->value[0]; //VQlo
+      CALID = influxReturn->scanID;
+
+      // Free Influx struct from ACS_DEV_VDAC
+      freeinfluxStruct(influxReturn);
 
       // don't trust myself to rewrite the below, just copy from vector into floats
       VIhi = dacV[0];
@@ -487,63 +477,60 @@ void const callback(char *filein){
 
       // this section unfuck-ifys special cases when ICE was off by one
       if (VQlo==0.){
-        VIhi=VIhi-(VIlo-VQhi);  //make up this lost data, it'l be close enough
-        VQhi = dacV[0];
-        VIlo = dacV[1];
-        VQlo = dacV[2];
+         VIhi=VIhi-(VIlo-VQhi);  //make up this lost data, it'l be close enough
+         VQhi = dacV[0];
+         VIlo = dacV[1];
+         VQlo = dacV[2];
       }
       
       if(VIhi==0.){ //Still no values?  bail and don't make spectra
-        //printf("no DAC values, bailing.\n");
-        //break;
-        printf("no DAC values, using defaults.\n");
-	VIhi = 2.1;
-	VQhi = 2.1;
-	VIlo = 1.9;
-	VQlo = 1.9;
+         //printf("no DAC values, bailing.\n");
+         //break;
+         printf("no DAC values, using defaults.\n");
+         VIhi = 2.1;
+         VQhi = 2.1;
+         VIlo = 1.9;
+         VQlo = 1.9;
       }
+
 
       // DEBUG
       if (DEBUG)
          printf("VIhi %.3f\tVQhi %.3f\tVIlo %.3f\tVQlo %.3f\n", VIhi, VQhi, VIlo, VQlo);
 
 
-		     
-      
-
       // Build the spectra filename and put it in the spectra directory
-      char fileout[512] = "";
+      //char fileout[512];
 
-      sprintf(fileout, "spectra/ACS%d_%s_%05d_DEV%d_INDX%04d_NINT%03d.txt", \
-                                               UNIT-1, prefix, scanID, DEV, dataN, j);
-      fout = fopen(fileout, "w");
+      //sprintf(fileout, "spectra/ACS%d_%s_%05d_DEV%d_INDX%04d_NINT%03d.txt", UNIT-1, prefix, scanID, DEV, dataN, j);
+      //fout = fopen(fileout, "w");
 
       //read human readable "Number of Lags"
       if (NBYTES==8256)
-        N = 512;
+         N = 512;
       else if (NBYTES==6208)
-        N = 384;
+         N = 384;
       else if (NBYTES==4160)
-        N = 256;
+         N = 256;
       else if (NBYTES==2112)
-        N = 128;
+         N = 128;
       int specA = (int) N/128 - 1;
 
       //We don't know the lag # until we open the file, so malloc now
-      corr.II   = malloc(N*sizeof(int32_t));
+      corr.II   = malloc(N*sizeof(int32_t));   //Uncorrected ints
       corr.QI   = malloc(N*sizeof(int32_t));
       corr.IQ   = malloc(N*sizeof(int32_t));
       corr.QQ   = malloc(N*sizeof(int32_t));
-      corr.IIqc = malloc(N*sizeof(float));
+      corr.IIqc = malloc(N*sizeof(float));     //Normalized Quantization Corrected floats
       corr.QIqc = malloc(N*sizeof(float));
       corr.IQqc = malloc(N*sizeof(float));
       corr.QQqc = malloc(N*sizeof(float));
-      //Rn  = malloc(2*N*sizeof(int32_t));
+      //Rn  = malloc(2*N*sizeof(int32_t));     //Rn,Rn2 ints for unquantization corrected
       //Rn2 = malloc(4*N*sizeof(int32_t));
-      Rn  = malloc(2*N*sizeof(float));
-      Rn2 = malloc(4*N*sizeof(float)-1);
+      Rn  = malloc(2*N*sizeof(float));         //Rn,Rn2 floats for normalizaed, quantization corrected
+      Rn2 = malloc(4*N*sizeof(float));
 
-      // Read lags
+      // Read lags in from file in order after header
       for(int i=0; i<N; i++){
          fread(&value, 4, 1, fp);
          corr.II[i] = value;
@@ -560,13 +547,11 @@ void const callback(char *filein){
       // PASS THE UNCORRECTED LAGS INTO PYTHON FOR QUANTIZATION CORRECTION HERE !!!
        
 
-
-if(DOQC){
+      if(DOQC){
       // create a Python list and fill it with normalized uncorrected correlation coefficients
       // Check for errors
       if (pModule != NULL) {
          // Get the function from the module
-         //pFunc2 = PyObject_GetAttrString(pModule, "qc");
 
          if (pFunc2 && PyCallable_Check(pFunc2)) {
             // For first four arguments: XmonL, XmonH, YmonL, YmonH
@@ -592,6 +577,7 @@ if(DOQC){
 	    PyTuple_SetItem(pArgsQQ, 3, PyFloat_FromDouble((double)corr.Qhi/(double)corr.corrtime));
 
             // For fifth argument: convert C array to a Python List
+	    // Creates new reference here.  pList** must be DECREF to free
             pListII = PyList_New(N);
             pListQI = PyList_New(N);
             pListIQ = PyList_New(N);
@@ -603,6 +589,7 @@ if(DOQC){
                PyList_SetItem(pListQI, i, PyFloat_FromDouble((double)corr.QI[i]/(double)corr.corrtime));
                PyList_SetItem(pListQQ, i, PyFloat_FromDouble((double)corr.QQ[i]/(double)corr.corrtime));
             }
+	    // pList** are stolen by SetItem here.  Do not DECREF
 	    PyTuple_SetItem(pArgsII, 4, pListII);
 	    PyTuple_SetItem(pArgsIQ, 4, pListIQ);
 	    PyTuple_SetItem(pArgsQI, 4, pListQI);
@@ -627,11 +614,6 @@ if(DOQC){
             if (pValueII != NULL && pValueIQ != NULL && pValueQI != NULL && pValueQQ != NULL) {
                // Extract the values from the returned list
                for (int i=0; i<N; ++i){
-		  // Fill corr struct with QC int32 values
-                //corr.II[i] = (int32_t) (0.5 * corr.corrtime * PyFloat_AsDouble(PyList_GetItem(pValueII, i)));
-                //corr.IQ[i] = (int32_t) (0.5 * corr.corrtime * PyFloat_AsDouble(PyList_GetItem(pValueIQ, i)));
-                //corr.QI[i] = (int32_t) (0.5 * corr.corrtime * PyFloat_AsDouble(PyList_GetItem(pValueQI, i)));
-                //corr.QQ[i] = (int32_t) (0.5 * corr.corrtime * PyFloat_AsDouble(PyList_GetItem(pValueQQ, i)));
 
 		  // Fill corrqc struct with normalized float32 QC values
                   corr.IIqc[i] = PyFloat_AsDouble(PyList_GetItem(pValueII, i));
@@ -639,7 +621,6 @@ if(DOQC){
                   corr.QIqc[i] = PyFloat_AsDouble(PyList_GetItem(pValueQI, i));
                   corr.QQqc[i] = PyFloat_AsDouble(PyList_GetItem(pValueQQ, i));
                }
-	       //Py_DECREF(pValueII);
             } else{
 	       PyErr_Print();
 	    }
@@ -654,37 +635,32 @@ if(DOQC){
 	    }
 
 
-	    // Clean Up
-	    // Py_DECREF(pListII);
          } else {
 	    if (PyErr_Occurred()) {
 	       PyErr_Print();
 	       fprintf(stderr, "Cannot find function\n");
 	    }
 	 }
-	 //Py_XDECREF(pFunc2);
-	 //Py_DECREF(pModule);
       } else {
 	 PyErr_Print();
 	 fprintf(stderr, "Failed to load the Python module\n");
       }
-}
-else
-{
-   for(int i=0; i<N; i++){
-	corr.IIqc[i] = corr.II[i]/corr.II[0];
-	corr.IQqc[i] = corr.IQ[i]/corr.IQ[0];
-	corr.QIqc[i] = corr.QI[i]/corr.QI[0];
-	corr.QQqc[i] = corr.QQ[i]/corr.QQ[0];
-   }
-}
+   }  // END IF DOQC
+      
+      // If we're not going to do the QC DLL, then just copy lags over and normlize them at least
+   else
+   {
+      for(int i=0; i<N; i++){
+         corr.IIqc[i] = corr.II[i]/corr.II[0];
+         corr.IQqc[i] = corr.IQ[i]/corr.IQ[0];
+         corr.QIqc[i] = corr.QI[i]/corr.QI[0];
+         corr.QQqc[i] = corr.QQ[i]/corr.QQ[0];
+      }
+   }  // END IF ELSE
 
 
+      // GET THE QUANTIZATION CORRECTED LAGS BACK AND  CONTINUE ON WITH LAGS->SPECTRA
 
-
-
-      // GET THE QUANTIZATION CORRECTED LAGS BACK AND USE BELOW !!!
-   
 
       // Combine IQ lags into R[]
          for(int i=0; i<(2*N)-1; i++){
@@ -727,35 +703,41 @@ else
          }
 
       // Do FFT and print
-        fftw_execute(spec[specA].p);
+         fftw_execute(spec[specA].p);
 
-        P_I = pow((VIhi-VIlo),2) * 1.8197 / pow((erfinv(1-2*(double)corr.Ihi/(double)corr.corrtime)) + \
-                                                (erfinv(1-2*(double)corr.Ilo/(double)corr.corrtime)),2);
-        P_Q = pow((VQhi-VQlo),2) * 1.8197 / pow((erfinv(1-2*(double)corr.Qhi/(double)corr.corrtime)) + \
-                                                (erfinv(1-2*(double)corr.Qlo/(double)corr.corrtime)),2);
+      // Compute Power Coefficients
+         P_I = pow((VIhi-VIlo),2) * 1.8197 / pow((erfinv(1-2*(double)corr.Ihi/(double)corr.corrtime)) + \
+                                                 (erfinv(1-2*(double)corr.Ilo/(double)corr.corrtime)),2);
+         P_Q = pow((VQhi-VQlo),2) * 1.8197 / pow((erfinv(1-2*(double)corr.Qhi/(double)corr.corrtime)) + \
+                                                 (erfinv(1-2*(double)corr.Qlo/(double)corr.corrtime)),2);
 
       // GET ALTERNATIVE POWER CALIBRATION FROM OMNISYS DLL
       // P_I,  P_Q calculated from the inverse error function using (Ihi, Ilow) is equal
       // to the relpower function from the Omnisys DLL to high precision. When  validated
-      // over a range of power levels (HOT, OTF, REF) the two give equal results up to a
-      // factor of 2.   (The factor 1.8197 likely comes from the erfinv for a 3-level ACS
-if(DOQC){
-      PyTuple_SetItem(pArgs1, 0, PyFloat_FromDouble((double)corr.Ilo/corr.corrtime));
-      PyTuple_SetItem(pArgs1, 1, PyFloat_FromDouble((double)corr.Ihi/corr.corrtime));
-      pValue = PyObject_CallObject(pFunc1, pArgs1);
-      Ipwr = 2. * pow((VIhi-VIlo),2) * PyFloat_AsDouble(pValue);
+      // over a range of power levels (HOT, OTF, REF) the two give equal results
+      // (The factor 1.8197 likely comes from the erfinv for a 3-level ACS)
+      
+      if(DOQC){ // Only do this if Python Objects are declared
+         PyTuple_SetItem(pArgs, 0, PyFloat_FromDouble((double)corr.Ilo/corr.corrtime));
+         PyTuple_SetItem(pArgs, 1, PyFloat_FromDouble((double)corr.Ihi/corr.corrtime));
+         pValue = PyObject_CallObject(pFunc1, pArgs);
+         Ipwr = 2. * pow((VIhi-VIlo),2) * PyFloat_AsDouble(pValue);
 
-      PyTuple_SetItem(pArgs1, 0, PyFloat_FromDouble((double)corr.Qlo/corr.corrtime));
-      PyTuple_SetItem(pArgs1, 1, PyFloat_FromDouble((double)corr.Qhi/corr.corrtime));
-      pValue = PyObject_CallObject(pFunc1, pArgs1);
-      Qpwr = 2. * pow((VQhi-VQlo),2) * PyFloat_AsDouble(pValue);
+         PyTuple_SetItem(pArgs, 0, PyFloat_FromDouble((double)corr.Qlo/corr.corrtime));
+         PyTuple_SetItem(pArgs, 1, PyFloat_FromDouble((double)corr.Qhi/corr.corrtime));
+         pValue = PyObject_CallObject(pFunc1, pArgs);
+         Qpwr = 2. * pow((VQhi-VQlo),2) * PyFloat_AsDouble(pValue);
 
-      // Output the relative power comparison
-      if (DEBUG)
-         printf("Ipwr is %f\tQpwr is %f\tP_I is %f\tP_Q is %f\n", Ipwr, Qpwr, P_I, P_Q);
-}
 
+         // Output the relative power comparison
+         if (DEBUG)
+            printf("Ipwr is %f\tQpwr is %f\tP_I is %f\tP_Q is %f\n", Ipwr, Qpwr, P_I, P_Q);
+      }
+
+      // Comment out all text spectral file outputs.  FITS done below
+      // Will be deprecated soon.
       // Header information in spectra file
+/*
       fprintf(fout, "UNIXTIME\t%" PRIu64 "\n", UNIXTIME);
       fprintf(fout, "CORRTIME\t%.6f\n", (corr.corrtime*256.)/(5000.*1000000.));
       fprintf(fout, "UNIT\t%d\n", UNIT);
@@ -773,7 +755,7 @@ if(DOQC){
 
     // Used calibration DAC voltages
       fprintf(fout, "VIHI\t%.3f\nVQHI\t%.3f\nVILO\t%.3f\nVQLO\t%.3f\n", VIhi, VQhi, VIlo, VQlo);
-      fprintf(fout, "CAL\t%d\n", influxReturn->scanID);
+      fprintf(fout, "CAL\t%d\n", CALID);
       fprintf(fout, "DATA\t%d\n", scanID);
 
     // Data consistency checks and error flaging
@@ -781,7 +763,11 @@ if(DOQC){
       fprintf(fout, "QERR\t%u\n", corr.Qerr);
       fprintf(fout, "ZEROLAGSUM_I\t%u\t%u\n", corr.Ihi+corr.Ilo, corr.II[0]);
       fprintf(fout, "ZEROLAGSUM_Q\t%u\t%u\n", corr.Qhi+corr.Qlo, corr.QQ[0]);
+*/
 
+      // Write to error log.
+      // Was for flight ops.  Probably will deprecate soon.
+      /*
       if(1)
       {
          errf = fopen(errfile, "a");
@@ -798,15 +784,23 @@ if(DOQC){
          fprintf(errf, "%u\n", abs((corr.Qhi+corr.Qlo)-corr.QQ[0]));
          fclose(errf);
       }
+      */
 
-      fprintf(fout, "ETAQ\t%.3f\n", 1/sqrt(P_I*P_Q));
+      //fprintf(fout, "ETAQ\t%.3f\n", 1/sqrt(P_I*P_Q));
    
       //Print in counts per second (assuming 5000 MHz sampling freq)
+      /*
       for(int i=0; i<2*N; i++){
-         fprintf(fout, "%d\t%lf\n", (5000*i)/(2*N), sqrt(P_I*P_Q) * sqrt(pow(spec[specA].out[i][0],2)+pow(spec[specA].out[i][1],2)));
+         fprintf(fout, "%d\t%lf\n", (5000*i)/(2*N), sqrt(P_I*P_Q) * \
+                                    sqrt(pow(spec[specA].out[i][0],2)+pow(spec[specA].out[i][1],2)));
       }
       fclose(fout); //close single spectra file
+      */
 		    
+
+/*
+ * Don't use this stuff, it was for V&V with the lags and spectra from LabView.
+ * Never gets utilized now, will be deprecated in the future
       if (DEBUG>1){
          fout = fopen("lags.txt", "w");
          //Save QC lags
@@ -831,9 +825,10 @@ if(DOQC){
          }
          fclose(fout);
       }
+ */
+
 
       // Construct the FITS HEADER
-      
 
       s_header *fits_header = (s_header *)malloc(sizeof(s_header));
       fits_header->type     = (char *)malloc(6);
@@ -861,16 +856,13 @@ if(DOQC){
       fits_header->VQlo     = VQlo;
 
       fits_header->scanID   = scanID;
-
       fits_header->RA       = RA;
       fits_header->DEC      = DEC;
-
       fits_header->THOT     = THOT;
 
-      fits_header->type     = prefix;
-      fits_header->filename = "ACS3_OTF_14755_0000.dat";
-      fits_header->target   = "TARGETNAME";
-
+      strcpy(fits_header->type, prefix);
+      strcpy(fits_header->filename, "ACS3_OTF_14755_0000.dat");
+      strcpy(fits_header->target, "TARGETNAME");
       
       // Construct the FITS DATA
       double array[1024];
@@ -879,11 +871,15 @@ if(DOQC){
       }
 
       // Let's try out CFITSIO!
-      char fitsfile[512] = "";
+      char fitsfile[20];
       sprintf(fitsfile, "ACS%d_%s_%05d.fits", UNIT-1, prefix, scanID);
+      printf("%s\n", fitsfile);
       append_to_fits_table(fitsfile, fits_header, array);
 
-      free(corr.II);    //free all mallocs
+
+      // Free items before next spectra within this file
+      // All of these objects are malloced at the start of every spectra
+      free(corr.II);      //free all mallocs
       free(corr.QI);
       free(corr.IQ);
       free(corr.QQ);
@@ -894,64 +890,105 @@ if(DOQC){
       free(Rn);
       free(Rn2);
 
+      free(fits_header->type);
+      free(fits_header->filename);
+      free(fits_header->target);
       free(fits_header);
 
 
    }
-free(query);
-free(prefix);
 
-
-//Py_INCREF(pArgs1);
-//Py_INCREF(pValue);
-
-//Py_INCREF(pListII);
-//Py_INCREF(pListIQ);
-//Py_INCREF(pListQI);
-//Py_INCREF(pListQQ);
-
-//Py_INCREF(pValueII);
-//Py_INCREF(pValueQI);
-//Py_INCREF(pValueIQ);
-//Py_INCREF(pValueQQ);
-
-/////////////////////////////  LOOP OVER ALL SPECTRA IN FILE  ///////////////////////////////////
+/////////////////////////////  END LOOP OVER ALL SPECTRA IN FILE  ///////////////////////////////////
    
-      fclose(fp);   //close input file
+   fclose(fp);   //close input data file
 		    
-      //ouput stats for last spectra in file
-      printf("\nUNIXTIME is %" PRIu64 "\n", UNIXTIME);
-      printf("CORRTIME is %.6f\n", (corr.corrtime*256.)/(5000.*1000000.));
-      printDateTimeFromEpoch((long long) UNIXTIME);
-      printf("UNIT is %d\n", UNIT);
-      printf("DEV  is %d\n",  DEV); 
-      printf("NINT is %d\n", NINT);
-      printf("%.2f %.2f %.2f %.2f\n",  (double)corr.Ihi/(double)corr.corrtime, \
-                                       (double)corr.Qhi/(double)corr.corrtime, \
-                                       (double)corr.Ilo/(double)corr.corrtime, \
-                                       (double)corr.Qlo/(double)corr.corrtime);
-      printf("nlags=%d\n", N);
-      printf("etaQ\t%.3f\n", 1/sqrt(P_I*P_Q));
-      printf("ETAQ\t%.3f\n\n", 1/sqrt(Ipwr*Qpwr));
+   //ouput stats for last spectra in file
+   printf("\nUNIXTIME is %" PRIu64 "\n", UNIXTIME);
+   printf("CORRTIME is %.6f\n", (corr.corrtime*256.)/(5000.*1000000.));
+   printDateTimeFromEpoch((long long) UNIXTIME);
+   printf("UNIT is %d\n", UNIT);
+   printf("DEV  is %d\n",  DEV); 
+   printf("NINT is %d\n", NINT);
+   printf("%.2f %.2f %.2f %.2f\n",  (double)corr.Ihi/(double)corr.corrtime, \
+                                    (double)corr.Qhi/(double)corr.corrtime, \
+                                    (double)corr.Ilo/(double)corr.corrtime, \
+                                    (double)corr.Qlo/(double)corr.corrtime);
+   printf("nlags=%d\n", N);
+   printf("etaQ\t%.3f\n", 1/sqrt(P_I*P_Q));
+   printf("ETAQ\t%.3f\n\n", 1/sqrt(Ipwr*Qpwr));
 
-      // current scanID, and scanID used for cal
-      printf("The cal  is from scanID: %d\n", influxReturn->scanID);
-      printf("The data is from scanID: %d\n", scanID);
-      if( influxReturn->scanID==0 ){
-        printf("######################## ERROR ###########################\n");
-        printf("#                                                        #\n");
-        printf("#           Error, calibration was no good!              #\n");
-        printf("#                                                        #\n");
-        printf("######################## ERROR ###########################\n");
-      }
+   // current scanID, and scanID used for cal
+   printf("The cal  is from scanID: %d\n", CALID);
+   printf("The THOT is from scanID: %d\n", THOTID);
+   printf("The data is from scanID: %d\n", scanID);
+   if( scanID==0 ){
+      printf("######################## ERROR ###########################\n");
+      printf("#                                                        #\n");
+      printf("#           Error, calibration was no good!              #\n");
+      printf("#                                                        #\n");
+      printf("######################## ERROR ###########################\n");
+   }
 
-      //timing
-      gettimeofday(&end, 0);
-      int seconds = end.tv_sec - begin.tv_sec;
-      int microseconds = end.tv_usec - begin.tv_usec;
-      double elapsed = seconds + microseconds*1e-6;
-      printf("AVG FFTW %.1f ms in %d spectra\n\n", 1000.*elapsed/(sz/bps), sz/bps);
-      fflush(stdout);
+   //timing
+   gettimeofday(&end, 0);
+   int seconds = end.tv_sec - begin.tv_sec;
+   int microseconds = end.tv_usec - begin.tv_usec;
+   double elapsed = seconds + microseconds*1e-6;
+   printf("AVG FFTW %.1f ms in %d spectra\n\n", 1000.*elapsed/(sz/bps), sz/bps);
+   fflush(stdout);
+
+   
+   // Clean Up memory before leaving callback()
+   // All of these objects are malloced at the start of callback but re-used every spectra
+   // 4 X pArgs 
+   printf("free pArgsII\t from refcount\t %ld\n", pArgsII->ob_refcnt);
+   Py_DECREF(pArgsII);
+   printf("free pArgsIQ\t from refcount\t %ld\n", pArgsIQ->ob_refcnt);
+   Py_DECREF(pArgsIQ);
+   printf("free pArgsQI\t from refcount\t %ld\n", pArgsQI->ob_refcnt);
+   Py_DECREF(pArgsQI);
+   printf("free pArgsQQ\t from refcount\t %ld\n", pArgsQQ->ob_refcnt);
+   Py_DECREF(pArgsQQ);
+    
+   // and the refpower
+   printf("free pArgs\t from refcount\t %ld\n", pArgs->ob_refcnt);
+   Py_DECREF(pArgs);
+
+   // 4 X pValue
+   printf("free pValueII\t from refcount\t %ld\n", pValueII->ob_refcnt);
+   Py_DECREF(pValueII);
+   printf("free pValueIQ\t from refcount\t %ld\n", pValueIQ->ob_refcnt);
+   Py_DECREF(pValueIQ);
+   printf("free pValueQI\t from refcount\t %ld\n", pValueQI->ob_refcnt);
+   Py_DECREF(pValueQI);
+   printf("free pValueQQ\t from refcount\t %ld\n", pValueQQ->ob_refcnt);
+   Py_DECREF(pValueQQ);
+	       
+   // and the refpower
+   printf("free pValue\t from refcount\t %ld\n", pValue->ob_refcnt);
+   Py_DECREF(pValue);
+   
+
+   // 4 X pList
+   // These don't need to be freed since PyList_SetItem() steals the reference
+   /*
+   printf("free pListII\t from refcount\t %ld\n", pListII->ob_refcnt);
+   Py_DECREF(pListII);
+   printf("free pListIQ\t from refcount\t %ld\n", pListIQ->ob_refcnt);
+   Py_DECREF(pListIQ);
+   printf("free pListQI\t from refcount\t %ld\n", pListQI->ob_refcnt);
+   Py_DECREF(pListQI);
+   printf("free pListQQ\t from refcount\t %ld\n", pListQQ->ob_refcnt);
+   Py_DECREF(pListQQ);
+   */
+     
+   printf("all Python Objects from callback() freed\n");
+     
+   // Free filename type char
+   free(prefix);
+
+   // Free Influx query string
+   free(query);
    
 }
 

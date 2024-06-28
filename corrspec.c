@@ -29,19 +29,22 @@ static void handler(int sig, siginfo_t *si, void *unused)
 {
    printf("Got SIGSEGV at address: 0x%lx\n", (long) si->si_addr);
    printf("Gracefully exiting\n");
+   sleep(3);
 
-   // close wenv connection
+   // close wenv connection to avoid many spawned Python.exe processes
    Py_DECREF(pFunc1);
    Py_DECREF(pFunc2);
    Py_DECREF(pModule);
    Py_DECREF(pName);
    Py_Finalize();
 
+   // Send email notification via perl script if run > 1hr AND completed succesfully
+   // 
 }
 
 int main(int argc, char **argv) {
 
-/*
+
    // Set up SIGSEGV handler
    struct sigaction sa;
    sa.sa_flags = SA_SIGINFO;
@@ -49,7 +52,7 @@ int main(int argc, char **argv) {
    sa.sa_sigaction = handler;
    if (sigaction(SIGSEGV, &sa, NULL) == -1)
 	   handle_error("sigaction");
-*/
+
 
    // Set up the Python C Extensions here (Used in callback() function in callback.c
    putenv("PYTHONPATH=./");
@@ -174,6 +177,9 @@ Py_DECREF(pFunc2);
 Py_DECREF(pModule);
 Py_DECREF(pName);
 Py_Finalize();
+
+   // Send email notification via perl script if run > 1hr AND completed succesfully
+   // 
 
    return 0;
 }
