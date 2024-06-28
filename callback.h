@@ -45,9 +45,10 @@ typedef struct s_header {
 	float		VIlo;
 	float		VQlo;
 	int		scanID;
+	int		CALID;
+	float		THOT;
 	float		RA;
 	float		DEC;
-	float		THOT;
 	char		*type;
 	char		*filename;
 	char		*target;

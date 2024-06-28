@@ -62,8 +62,8 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
 
             // Define the column parameters
             char *ttype[] ={"UNIT", "DEV", "NINT", "UNIXTIME", "CPU", "NBYTES", "CORRTIME", "Ihigh", "Qhigh", \
-			    "Ilow", "Qlow", "Ierr", "Qerr", "VIhi", "VQhi", "VIlo", "VQlo", "scanID", "RA", "DEC", \
-			    "THOT", "scan_type", "filename", "target", "spec"};
+			    "Ilow", "Qlow", "Ierr", "Qerr", "VIhi", "VQhi", "VIlo", "VQlo", "scanID", "CALID", \
+		            "THOT", "RA", "DEC", "scan_type", "filename", "target", "spec"};
 
 	    // All header values are signed 32-bit except UNIXTIME which is uint64_t
             char *tform[25];
@@ -84,20 +84,24 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
             tform[14] = "1E"; //float	Vdac
             tform[15] = "1E"; //float	Vdac
             tform[16] = "1E"; //float	Vdac
+			      //
             tform[17] = "1J"; //int	scanID
-            tform[18] = "1E"; //float	RA
-            tform[19] = "1E"; //float	DEC
-            tform[20] = "1E"; //float	THOT
-	    tform[21] = "6A";
-	    tform[22] = "32A";
-	    tform[23] = "16A";
-	    tform[24] = "1024E";
+            tform[18] = "1J"; //int	CALID
+            tform[19] = "1E"; //float	THOT
+			      //
+            tform[20] = "1E"; //float	RA
+            tform[21] = "1E"; //float	DEC
+			      //
+	    tform[22] = "6A"; //char    scan type
+	    tform[23] = "32A";//char    filename
+	    tform[24] = "16A";//char    TARGET
+	    tform[25] = "1024E";
 
-            char *tunit[25];
-	    for(int i=0; i<25; i++)
+            char *tunit[26];
+	    for(int i=0; i<26; i++)
 	         tunit[i] = " ";
 
-	    int tfields = 25;
+	    int tfields = 26;
 
             // Create a binary table
             if (fits_create_tbl(fptr, BINARY_TBL, 0, tfields   , ttype, tform, tunit, extname, &status)) {
@@ -152,16 +156,17 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
     fits_write_col(fptr, TFLOAT,    17, nrows+1,  1, 1, &fits_header->VQlo, &status);
 									       
     fits_write_col(fptr, TINT32BIT, 18, nrows+1,  1, 1, &fits_header->scanID, &status);
-    fits_write_col(fptr, TFLOAT,    19, nrows+1,  1, 1, &fits_header->RA, &status);
-    fits_write_col(fptr, TFLOAT,    20, nrows+1,  1, 1, &fits_header->DEC, &status);
-    fits_write_col(fptr, TFLOAT,    21, nrows+1,  1, 1, &fits_header->THOT, &status);
+    fits_write_col(fptr, TINT32BIT, 19, nrows+1,  1, 1, &fits_header->CALID, &status);
+    fits_write_col(fptr, TFLOAT,    20, nrows+1,  1, 1, &fits_header->THOT, &status);
+    fits_write_col(fptr, TFLOAT,    21, nrows+1,  1, 1, &fits_header->RA, &status);
+    fits_write_col(fptr, TFLOAT,    22, nrows+1,  1, 1, &fits_header->DEC, &status);
 
-    fits_write_col(fptr, TSTRING,   22, nrows+1,  1, 1, &fits_header->type, &status);
-    fits_write_col(fptr, TSTRING,   23, nrows+1,  1, 1, &fits_header->filename, &status);
-    fits_write_col(fptr, TSTRING,   24, nrows+1,  1, 1, &fits_header->target, &status);
+    fits_write_col(fptr, TSTRING,   23, nrows+1,  1, 1, &fits_header->type, &status);
+    fits_write_col(fptr, TSTRING,   24, nrows+1,  1, 1, &fits_header->filename, &status);
+    fits_write_col(fptr, TSTRING,   25, nrows+1,  1, 1, &fits_header->target, &status);
 									     
     // Write the spectra as a single 1*1024 column
-    if (fits_write_col(fptr, TDOUBLE, 25, nrows+1 , 1, 1 * 1024, array, &status)) {
+    if (fits_write_col(fptr, TDOUBLE, 26, nrows+1 , 1, 1 * 1024, array, &status)) {
         fits_report_error(stderr, status);  // Print any error message
         return;
     }
@@ -344,22 +349,22 @@ void const callback(char *filein){
    // Build a regex with the range of the previous 8 scanID #s for Correlator DACs
    char scanIDregex[512];
    int pos = 0;
-   pos += sprintf(&scanIDregex[pos], "(");
+   pos += sprintf(&scanIDregex[pos], "^(");
    for (int k=0; k<30; k++){
       pos += sprintf(&scanIDregex[pos], "%d|", scanID-k);
    }
-   pos += sprintf(&scanIDregex[pos], "%d)", scanID-30);
+   pos += sprintf(&scanIDregex[pos], "%d)$", scanID-30);
    printf("%s\n", scanIDregex);
 
 
    // Build a regex with the range of the previous 2 and next 2 scanID #s for HK_TEMP11
    char HOTregex[512];
    pos = 0;
-   pos += sprintf(&HOTregex[pos], "(");
+   pos += sprintf(&HOTregex[pos], "^(");
    for (int k=0; k<4; k++){
       pos += sprintf(&HOTregex[pos], "%d|", scanID-k+2);
    }
-   pos += sprintf(&HOTregex[pos], "%d)", scanID-2);
+   pos += sprintf(&HOTregex[pos], "%d)$", scanID-2);
    printf("%s\n", HOTregex);
 
 
@@ -856,9 +861,10 @@ void const callback(char *filein){
       fits_header->VQlo     = VQlo;
 
       fits_header->scanID   = scanID;
+      fits_header->CALID    = CALID;
+      fits_header->THOT     = THOT;
       fits_header->RA       = RA;
       fits_header->DEC      = DEC;
-      fits_header->THOT     = THOT;
 
       strcpy(fits_header->type, prefix);
       strcpy(fits_header->filename, "ACS3_OTF_14755_0000.dat");
