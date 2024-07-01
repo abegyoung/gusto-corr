@@ -13,7 +13,7 @@ fi
 cd "$directory_path" || exit 1
 
 # Iterate over files in the directory
-for file in series_??_??.*; do
+for file in series_????_????-2.*; do
     # Check if the item is a file
     if [ -f "$file" ]; then
         # Extract the file extension
