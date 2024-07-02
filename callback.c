@@ -177,7 +177,7 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
         return;
     }
 
-    printf("Array appended as a new row in the FITS table successfully.\n\n");
+    printf("Array appended as a new row in the FITS table successfully.\n");
 }
 
 void printDateTimeFromEpoch(time_t ts){
@@ -429,7 +429,8 @@ void const callback(char *filein){
 // end declaration/free loop test
 //
 
-   printf("The type is %s\n", prefix);
+   if (DEBUG)
+      printf("The type is %s\n", prefix);
       // Loop over header location
       for(int i=0; i<22; i++){
          if(i==3){
@@ -465,13 +466,14 @@ void const callback(char *filein){
            corr.Ihi==0 ||  corr.Qhi==0 || corr.Ilo==0 || corr.Qlo==0 || \
            (corr.corrtime*256.)/(5000.*1000000.)<0.1 )
       {
-         printf("######################## ERROR ###########################\n");
-         printf("#                                                        #\n");
-         printf("#                Error, data is no good!                 #\n");
-         printf("#                        Exiting!                        #\n");
-         printf("#                                                        #\n");
-         printf("######################## ERROR ###########################\n");
+         //printf("######################## ERROR ###########################\n");
+         //printf("#                                                        #\n");
+         //printf("#                Error, data is no good!                 #\n");
+         //printf("#                        Exiting!                        #\n");
+         //printf("#                                                        #\n");
+         //printf("######################## ERROR ###########################\n");
          //break;
+	 continue;
       }
 
       // RA, DEC from InfluxDB 0.5s ahead or behind time
@@ -495,7 +497,8 @@ void const callback(char *filein){
       THOT = influxReturn->value[0] + 273.13;
       THOTID = influxReturn->scanID;
 
-      printf("======== RA=%.3f DEC=%.3f THOT=%.1f==========\n", RA, DEC, THOT);  //Info print
+      if (DEBUG)
+         printf("======== RA=%.3f DEC=%.3f THOT=%.1f==========\n", RA, DEC, THOT);  //Info print
 
       // Free the allocated memory from HK_TEMP11
       freeinfluxStruct(influxReturn);
@@ -919,7 +922,8 @@ void const callback(char *filein){
       // Let's try out CFITSIO!
       char fitsfile[20];
       sprintf(fitsfile, "ACS%d_%s_%05d.fits", UNIT-1, prefix, scanID);
-      printf("%s\n", fitsfile);
+      if (DEBUG)
+         printf("%s\n", fitsfile);
       append_to_fits_table(fitsfile, fits_header, array);
 
 
@@ -948,37 +952,37 @@ void const callback(char *filein){
    // Clean Up memory before leaving callback()
    // All of these objects are malloced at the start of callback but re-used every spectra
    // 4 X pArgs 
-   printf("free pArgsII\t from refcount\t %ld\n", pArgsII->ob_refcnt);
+   //printf("free pArgsII\t from refcount\t %ld\n", pArgsII->ob_refcnt);
    Py_DECREF(pArgsII);
-   printf("free pArgsIQ\t from refcount\t %ld\n", pArgsIQ->ob_refcnt);
+   //printf("free pArgsIQ\t from refcount\t %ld\n", pArgsIQ->ob_refcnt);
    Py_DECREF(pArgsIQ);
-   printf("free pArgsQI\t from refcount\t %ld\n", pArgsQI->ob_refcnt);
+   //printf("free pArgsQI\t from refcount\t %ld\n", pArgsQI->ob_refcnt);
    Py_DECREF(pArgsQI);
-   printf("free pArgsQQ\t from refcount\t %ld\n", pArgsQQ->ob_refcnt);
+   //printf("free pArgsQQ\t from refcount\t %ld\n", pArgsQQ->ob_refcnt);
    Py_DECREF(pArgsQQ);
     
    // and the refpower
-   printf("free pArgs\t from refcount\t %ld\n", pArgs->ob_refcnt);
+   //printf("free pArgs\t from refcount\t %ld\n", pArgs->ob_refcnt);
    Py_DECREF(pArgs);
 
    // 4 X pValue
-   printf("free pValueII\t from refcount\t %ld\n", pValueII->ob_refcnt);
+   //printf("free pValueII\t from refcount\t %ld\n", pValueII->ob_refcnt);
    Py_DECREF(pValueII);
-   printf("free pValueIQ\t from refcount\t %ld\n", pValueIQ->ob_refcnt);
+   //printf("free pValueIQ\t from refcount\t %ld\n", pValueIQ->ob_refcnt);
    Py_DECREF(pValueIQ);
-   printf("free pValueQI\t from refcount\t %ld\n", pValueQI->ob_refcnt);
+   //printf("free pValueQI\t from refcount\t %ld\n", pValueQI->ob_refcnt);
    Py_DECREF(pValueQI);
-   printf("free pValueQQ\t from refcount\t %ld\n", pValueQQ->ob_refcnt);
+   //printf("free pValueQQ\t from refcount\t %ld\n", pValueQQ->ob_refcnt);
    Py_DECREF(pValueQQ);
 	       
    // and the refpower
-   printf("free pValue\t from refcount\t %ld\n", pValue->ob_refcnt);
+   //printf("free pValue\t from refcount\t %ld\n", pValue->ob_refcnt);
    Py_DECREF(pValue);
    
 
    // 4 X pList
    // These don't need to be freed since PyList_SetItem() steals the reference
-   
+   /*
    printf("free pListII\t from refcount\t %ld\n", pListII->ob_refcnt);
    Py_DECREF(pListII);
    printf("free pListIQ\t from refcount\t %ld\n", pListIQ->ob_refcnt);
@@ -987,9 +991,10 @@ void const callback(char *filein){
    Py_DECREF(pListQI);
    printf("free pListQQ\t from refcount\t %ld\n", pListQQ->ob_refcnt);
    Py_DECREF(pListQQ);
-   
+   */
      
-   printf("all Python Objects from callback() freed\n");
+   if (DEBUG)
+      printf("all Python Objects from callback() freed\n\n");
  
  //
  // end test free in loop
