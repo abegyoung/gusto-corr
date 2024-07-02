@@ -235,6 +235,12 @@ void const callback(char *filein){
 
    //char errfile[64] = "err.log";
 
+//========================
+//
+// moved PyObject stuff out of here to spectra loop
+//
+//========================
+/*
    // Python objects for refpower
    // pArgs 
    PyObject *pArgs;
@@ -253,8 +259,13 @@ void const callback(char *filein){
       pArgsQI = PyTuple_New(5); // for qc(QmonL, QmonH, ImonL, ImonH, corr.IQ)
       pArgsQQ = PyTuple_New(5); // for qc(QmonL, QmonH, QmonL, QmonH, corr.QQ)
    }
-
+*/
    // End Python initilization
+//========================
+//
+// moved PyObject stuff out of here to spectra loop
+//
+//========================
 
 
    // InfluxDB easy_curl objects
@@ -391,6 +402,33 @@ void const callback(char *filein){
    // Start at beginning of data file
    for(int j=0; j<(int)sz/bps; j++)
    {
+
+//////////////
+//
+// Test of declaring and freeing within 100 spectra loop
+//
+   // Python objects for refpower
+   // pArgs 
+   PyObject *pArgs;
+   PyObject *pValue;
+
+   // Python objects for quantization correction
+   PyObject *pArgsII, *pArgsQI, *pArgsIQ, *pArgsQQ; 
+   PyObject *pListII, *pListQI, *pListIQ, *pListQQ; 
+   PyObject *pValueII, *pValueQI, *pValueIQ, *pValueQQ; 
+
+   // Arguments to relpower(XmonL, XmonH)
+   if(DOQC){
+      pArgs   = PyTuple_New(2); // for relpower(XmonL, XmonH)
+      pArgsII = PyTuple_New(5); // for qc(ImonL, ImonH, ImonL, ImonH, corr.II)
+      pArgsIQ = PyTuple_New(5); // for qc(ImonL, ImonH, QmonL, QmonH, corr.IQ)
+      pArgsQI = PyTuple_New(5); // for qc(QmonL, QmonH, ImonL, ImonH, corr.IQ)
+      pArgsQQ = PyTuple_New(5); // for qc(QmonL, QmonH, QmonL, QmonH, corr.QQ)
+   }
+//
+// end declaration/free loop test
+//
+
    printf("The type is %s\n", prefix);
       // Loop over header location
       for(int i=0; i<22; i++){
@@ -437,6 +475,8 @@ void const callback(char *filein){
       }
 
       // RA, DEC from InfluxDB 0.5s ahead or behind time
+      // hesperia DB = 28800
+      // sculptor DB = 25200
       curl = init_influx();
       sprintf(query, "&q=SELECT *   FROM \"udpPointing\" WHERE \"scanID\"=~/%d/ AND time>\%" PRIu64 "500000000 AND time<\%" PRIu64 "500000000", scanID, UNIXTIME-1-28800, UNIXTIME+0-28800);
       influxReturn = influxWorker(curl, query);
@@ -901,6 +941,59 @@ void const callback(char *filein){
       free(fits_header->target);
       free(fits_header);
 
+//
+// move to within 100 spectra loop
+//
+
+   // Clean Up memory before leaving callback()
+   // All of these objects are malloced at the start of callback but re-used every spectra
+   // 4 X pArgs 
+   printf("free pArgsII\t from refcount\t %ld\n", pArgsII->ob_refcnt);
+   Py_DECREF(pArgsII);
+   printf("free pArgsIQ\t from refcount\t %ld\n", pArgsIQ->ob_refcnt);
+   Py_DECREF(pArgsIQ);
+   printf("free pArgsQI\t from refcount\t %ld\n", pArgsQI->ob_refcnt);
+   Py_DECREF(pArgsQI);
+   printf("free pArgsQQ\t from refcount\t %ld\n", pArgsQQ->ob_refcnt);
+   Py_DECREF(pArgsQQ);
+    
+   // and the refpower
+   printf("free pArgs\t from refcount\t %ld\n", pArgs->ob_refcnt);
+   Py_DECREF(pArgs);
+
+   // 4 X pValue
+   printf("free pValueII\t from refcount\t %ld\n", pValueII->ob_refcnt);
+   Py_DECREF(pValueII);
+   printf("free pValueIQ\t from refcount\t %ld\n", pValueIQ->ob_refcnt);
+   Py_DECREF(pValueIQ);
+   printf("free pValueQI\t from refcount\t %ld\n", pValueQI->ob_refcnt);
+   Py_DECREF(pValueQI);
+   printf("free pValueQQ\t from refcount\t %ld\n", pValueQQ->ob_refcnt);
+   Py_DECREF(pValueQQ);
+	       
+   // and the refpower
+   printf("free pValue\t from refcount\t %ld\n", pValue->ob_refcnt);
+   Py_DECREF(pValue);
+   
+
+   // 4 X pList
+   // These don't need to be freed since PyList_SetItem() steals the reference
+   
+   printf("free pListII\t from refcount\t %ld\n", pListII->ob_refcnt);
+   Py_DECREF(pListII);
+   printf("free pListIQ\t from refcount\t %ld\n", pListIQ->ob_refcnt);
+   Py_DECREF(pListIQ);
+   printf("free pListQI\t from refcount\t %ld\n", pListQI->ob_refcnt);
+   Py_DECREF(pListQI);
+   printf("free pListQQ\t from refcount\t %ld\n", pListQQ->ob_refcnt);
+   Py_DECREF(pListQQ);
+   
+     
+   printf("all Python Objects from callback() freed\n");
+ 
+ //
+ // end test free in loop
+ //
 
    }
 
@@ -944,6 +1037,10 @@ void const callback(char *filein){
    fflush(stdout);
 
    
+//
+// move to within 100 spectra loop
+//
+/*
    // Clean Up memory before leaving callback()
    // All of these objects are malloced at the start of callback but re-used every spectra
    // 4 X pArgs 
@@ -977,7 +1074,7 @@ void const callback(char *filein){
 
    // 4 X pList
    // These don't need to be freed since PyList_SetItem() steals the reference
-   /*
+   
    printf("free pListII\t from refcount\t %ld\n", pListII->ob_refcnt);
    Py_DECREF(pListII);
    printf("free pListIQ\t from refcount\t %ld\n", pListIQ->ob_refcnt);
@@ -986,9 +1083,13 @@ void const callback(char *filein){
    Py_DECREF(pListQI);
    printf("free pListQQ\t from refcount\t %ld\n", pListQQ->ob_refcnt);
    Py_DECREF(pListQQ);
-   */
+   
      
    printf("all Python Objects from callback() freed\n");
+ */
+ //
+ // end test free in loop
+ //
      
    // Free filename type char
    free(prefix);
