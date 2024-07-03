@@ -45,6 +45,7 @@ typedef struct s_header {
 	float		VIlo;
 	float		VQlo;
 	int		scanID;
+	int		subScan;
 	int		CALID;
 	float		THOT;
 	float		RA;

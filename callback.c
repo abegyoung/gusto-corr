@@ -63,11 +63,11 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
 
             // Define the column parameters
             char *ttype[] ={"UNIT", "DEV", "NINT", "UNIXTIME", "CPU", "NBYTES", "CORRTIME", "Ihigh", "Qhigh", \
-			    "Ilow", "Qlow", "Ierr", "Qerr", "VIhi", "VQhi", "VIlo", "VQlo", "scanID", "CALID", \
-		            "THOT", "RA", "DEC", "scan_type", "filename", "target", "spec"};
+			    "Ilow", "Qlow", "Ierr", "Qerr", "VIhi", "VQhi", "VIlo", "VQlo", "scanID", "subScan", \
+		            "CALID", "THOT", "RA", "DEC", "scan_type", "filename", "target", "spec"};
 
 	    // All header values are signed 32-bit except UNIXTIME which is uint64_t
-            char *tform[25];
+            char *tform[26];
 	    tform[0]  = "1J"; //int
 	    tform[1]  = "1J"; //int	
 	    tform[2]  = "1J"; //int
@@ -87,22 +87,23 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
             tform[16] = "1E"; //float	Vdac
 			      //
             tform[17] = "1J"; //int	scanID
-            tform[18] = "1J"; //int	CALID
-            tform[19] = "1E"; //float	THOT
+            tform[18] = "1J"; //int	subScan
+            tform[19] = "1J"; //int	CALID
+            tform[20] = "1E"; //float	THOT
 			      //
-            tform[20] = "1E"; //float	RA
-            tform[21] = "1E"; //float	DEC
+            tform[21] = "1E"; //float	RA
+            tform[22] = "1E"; //float	DEC
 			      //
-	    tform[22] = "6A"; //char    scan type
-	    tform[23] = "32A";//char    filename
-	    tform[24] = "16A";//char    TARGET
-	    tform[25] = "1024E";
+	    tform[23] = "6A"; //char    scan type
+	    tform[24] = "48A";//char    filename
+	    tform[25] = "16A";//char    TARGET
+	    tform[26] = "1024E";
 
-            char *tunit[26];
-	    for(int i=0; i<26; i++)
+            char *tunit[27];
+	    for(int i=0; i<27; i++)
 	         tunit[i] = " ";
 
-	    int tfields = 26;
+	    int tfields = 27;
 
             // Create a binary table
             if (fits_create_tbl(fptr, BINARY_TBL, 0, tfields   , ttype, tform, tunit, extname, &status)) {
@@ -157,17 +158,18 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
     fits_write_col(fptr, TFLOAT,    17, nrows+1,  1, 1, &fits_header->VQlo, &status);
 									       
     fits_write_col(fptr, TINT32BIT, 18, nrows+1,  1, 1, &fits_header->scanID, &status);
-    fits_write_col(fptr, TINT32BIT, 19, nrows+1,  1, 1, &fits_header->CALID, &status);
-    fits_write_col(fptr, TFLOAT,    20, nrows+1,  1, 1, &fits_header->THOT, &status);
-    fits_write_col(fptr, TFLOAT,    21, nrows+1,  1, 1, &fits_header->RA, &status);
-    fits_write_col(fptr, TFLOAT,    22, nrows+1,  1, 1, &fits_header->DEC, &status);
+    fits_write_col(fptr, TINT32BIT, 19, nrows+1,  1, 1, &fits_header->subScan, &status);
+    fits_write_col(fptr, TINT32BIT, 20, nrows+1,  1, 1, &fits_header->CALID, &status);
+    fits_write_col(fptr, TFLOAT,    21, nrows+1,  1, 1, &fits_header->THOT, &status);
+    fits_write_col(fptr, TFLOAT,    22, nrows+1,  1, 1, &fits_header->RA, &status);
+    fits_write_col(fptr, TFLOAT,    23, nrows+1,  1, 1, &fits_header->DEC, &status);
 
-    fits_write_col(fptr, TSTRING,   23, nrows+1,  1, 1, &fits_header->type, &status);
-    fits_write_col(fptr, TSTRING,   24, nrows+1,  1, 1, &fits_header->filename, &status);
-    fits_write_col(fptr, TSTRING,   25, nrows+1,  1, 1, &fits_header->target, &status);
+    fits_write_col(fptr, TSTRING,   24, nrows+1,  1, 1, &fits_header->type, &status);
+    fits_write_col(fptr, TSTRING,   25, nrows+1,  1, 1, &fits_header->filename, &status);
+    fits_write_col(fptr, TSTRING,   26, nrows+1,  1, 1, &fits_header->target, &status);
 									     
     // Write the spectra as a single 1*1024 column
-    if (fits_write_col(fptr, TDOUBLE, 26, nrows+1 , 1, 1 * 1024, array, &status)) {
+    if (fits_write_col(fptr, TDOUBLE, 27, nrows+1 , 1, 1 * 1024, array, &status)) {
         fits_report_error(stderr, status);  // Print any error message
         return;
     }
@@ -232,7 +234,8 @@ void const callback(struct inotify_event *event, const char *directory){
 
 #ifdef NO_FS
 void const callback(char *filein){
-   char *name = filein;
+   char *name = malloc(48*sizeof(char));
+   strcpy(name, filein);
 #endif
 
    //char errfile[64] = "err.log";
@@ -331,13 +334,13 @@ void const callback(char *filein){
    printf("The type is %s\n", prefix);
 
    // Find scanID from filename
-   int scanID = -1;
-   int CALID = -1;
-   int THOTID = -1;
-   int dataN;
    char *token;
    int position = 0;
-   bool error = FALSE;
+   int scanID  = -1;
+   int CALID   = -1;
+   int THOTID  = -1;
+   int subScan = -1;
+   bool error  = FALSE;
 
     // Use strtok to tokenize the filename using underscores as delimiters
     token = strtok(filein, "_");
@@ -352,8 +355,8 @@ void const callback(char *filein){
       }
 
       if (position == 2 ) {      //get scanID
-         dataN = atoi(token);
-         printf("The data file index # is: %05d\n", dataN);
+         subScan = atoi(token);
+         printf("The data file index # is: %05d\n", subScan);
       }
 
       position++;
@@ -376,10 +379,10 @@ void const callback(char *filein){
    char HOTregex[512];
    pos = 0;
    pos += sprintf(&HOTregex[pos], "^(");
-   for (int k=0; k<4; k++){
-      pos += sprintf(&HOTregex[pos], "%d|", scanID-k+2);
+   for (int k=0; k<24; k++){
+      pos += sprintf(&HOTregex[pos], "%d|", scanID-k+12);
    }
-   pos += sprintf(&HOTregex[pos], "%d)$", scanID-2);
+   pos += sprintf(&HOTregex[pos], "%d)$", scanID-12);
    if (DEBUG)
       printf("%s\n", HOTregex);
 
@@ -561,7 +564,7 @@ void const callback(char *filein){
       // Build the spectra filename and put it in the spectra directory
       //char fileout[512];
 
-      //sprintf(fileout, "spectra/ACS%d_%s_%05d_DEV%d_INDX%04d_NINT%03d.txt", UNIT-1, prefix, scanID, DEV, dataN, j);
+      //sprintf(fileout, "spectra/ACS%d_%s_%05d_DEV%d_INDX%04d_NINT%03d.txt", UNIT-1, prefix, scanID, DEV, subScan, j);
       //fout = fopen(fileout, "w");
 
       //read human readable "Number of Lags"
@@ -891,7 +894,7 @@ void const callback(char *filein){
 
       s_header *fits_header = (s_header *)malloc(sizeof(s_header));
       fits_header->type     = (char *)malloc(6);
-      fits_header->filename = (char *)malloc(32);
+      fits_header->filename = (char *)malloc(48);
       fits_header->target   = (char *)malloc(16);
 
       fits_header->unit     = UNIT;
@@ -915,13 +918,16 @@ void const callback(char *filein){
       fits_header->VQlo     = VQlo;
 
       fits_header->scanID   = scanID;
+      fits_header->subScan  = subScan;
       fits_header->CALID    = CALID;
       fits_header->THOT     = THOT;
       fits_header->RA       = RA;
       fits_header->DEC      = DEC;
 
       strcpy(fits_header->type, prefix);
-      strcpy(fits_header->filename, "ACS3_OTF_14755_0000.dat");
+      //strcpy(fits_header->filename, "ACS3_OTF_14755_0000.dat");
+      printf("%s\n", name);
+      strcpy(fits_header->filename, name);
       strcpy(fits_header->target, "TARGETNAME");
       
       // Construct the FITS DATA
@@ -1109,6 +1115,9 @@ void const callback(char *filein){
 
    // Free Influx query string
    free(query);
+
+   // Free Influx query string
+   free(name);
    
 }
 
