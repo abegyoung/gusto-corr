@@ -11,11 +11,12 @@
 #include <Python.h>
 
 #include <stdio.h>
+#include <stdbool.h>
 #include <fitsio.h>
 
 #define PI 3.14159
 #define BUFSIZE 128
-#define DEBUG 1
+#define DEBUG 0
 #define DOQC 1
 
 
@@ -177,7 +178,8 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
         return;
     }
 
-    printf("Array appended as a new row in the FITS table successfully.\n");
+    if (DEBUG)
+       printf("Array appended as a new row in the FITS table successfully.\n");
 }
 
 void printDateTimeFromEpoch(time_t ts){
@@ -335,6 +337,7 @@ void const callback(char *filein){
    int dataN;
    char *token;
    int position = 0;
+   bool error = FALSE;
 
     // Use strtok to tokenize the filename using underscores as delimiters
     token = strtok(filein, "_");
@@ -361,11 +364,12 @@ void const callback(char *filein){
    char scanIDregex[512];
    int pos = 0;
    pos += sprintf(&scanIDregex[pos], "^(");
-   for (int k=0; k<30; k++){
+   for (int k=0; k<15; k++){
       pos += sprintf(&scanIDregex[pos], "%d|", scanID-k);
    }
-   pos += sprintf(&scanIDregex[pos], "%d)$", scanID-30);
-   printf("%s\n", scanIDregex);
+   pos += sprintf(&scanIDregex[pos], "%d)$", scanID-15);
+   if (DEBUG)
+      printf("%s\n", scanIDregex);
 
 
    // Build a regex with the range of the previous 2 and next 2 scanID #s for HK_TEMP11
@@ -376,7 +380,8 @@ void const callback(char *filein){
       pos += sprintf(&HOTregex[pos], "%d|", scanID-k+2);
    }
    pos += sprintf(&HOTregex[pos], "%d)$", scanID-2);
-   printf("%s\n", HOTregex);
+   if (DEBUG)
+      printf("%s\n", HOTregex);
 
 
    int32_t value;
@@ -464,16 +469,18 @@ void const callback(char *filein){
 
       if (corr.Ierr!=0 || corr.Qerr!=0 || \
            corr.Ihi==0 ||  corr.Qhi==0 || corr.Ilo==0 || corr.Qlo==0 || \
-           (corr.corrtime*256.)/(5000.*1000000.)<0.1 )
+           (corr.corrtime*256.)/(5000.*1000000.)<0.1 || (corr.corrtime*256.)/(5000.*1000000.)>10.0 )
       {
-         //printf("######################## ERROR ###########################\n");
-         //printf("#                                                        #\n");
-         //printf("#                Error, data is no good!                 #\n");
-         //printf("#                        Exiting!                        #\n");
-         //printf("#                                                        #\n");
-         //printf("######################## ERROR ###########################\n");
-         //break;
-	 continue;
+         printf("######################## ERROR ###########################\n");
+         printf("#                                                        #\n");
+         printf("#                Error, data is no good!                 #\n");
+         printf("#                        Exiting!                        #\n");
+         printf("#                                                        #\n");
+         printf("######################## ERROR ###########################\n");
+         printf("CORRTIME was %.6f\n\n", (corr.corrtime*256.)/(5000.*1000000.));
+	 error = TRUE;
+         break;
+	 //continue;
       }
 
       // RA, DEC from InfluxDB 0.5s ahead or behind time
@@ -491,8 +498,7 @@ void const callback(char *filein){
      
       // Most recent HOT temperature from current scanID or ahead/behind 2 scanIDs
       curl = init_influx();
-      sprintf(query, "&q=SELECT temp FROM \"HK_TEMP11\"   WHERE \"scanID\"=~/%d/ AND time>\%" PRIu64 "000000000 AND time<\%" PRIu64 "000000000", scanID, UNIXTIME-1-1000, UNIXTIME+1+1000);
-      sprintf(query, "&q=SELECT * FROM \"HK_TEMP11\"   WHERE \"scanID\"=~/%s/ ORDER BY time DESC LIMIT 10", HOTregex);
+      sprintf(query, "&q=SELECT * FROM \"HK_TEMP11\"   WHERE \"scanID\"=~/%s/ ORDER BY time DESC LIMIT 3", HOTregex);
       influxReturn = influxWorker(curl, query);
       THOT = influxReturn->value[0] + 273.13;
       THOTID = influxReturn->scanID;
@@ -532,13 +538,18 @@ void const callback(char *filein){
       }
       
       if(VIhi==0.){ //Still no values?  bail and don't make spectra
-         //printf("no DAC values, bailing.\n");
-         //break;
-         printf("no DAC values, using defaults.\n");
-         VIhi = 2.1;
-         VQhi = 2.1;
-         VIlo = 1.9;
-         VQlo = 1.9;
+         printf("######################## ERROR ###########################\n");
+         printf("#                                                        #\n");
+         printf("#                  Error, no DAC values!                 #\n");
+         printf("#                        Exiting!                        #\n");
+         printf("#                                                        #\n");
+         printf("######################## ERROR ###########################\n");
+         break;
+         //printf("no DAC values, using defaults.\n");
+         //VIhi = 2.1;
+         //VQhi = 2.1;
+         //VIlo = 1.9;
+         //VQlo = 1.9;
       }
 
 
@@ -1006,31 +1017,27 @@ void const callback(char *filein){
    
    fclose(fp);   //close input data file
 		    
-   //ouput stats for last spectra in file
-   printf("\nUNIXTIME is %" PRIu64 "\n", UNIXTIME);
-   printf("CORRTIME is %.6f\n", (corr.corrtime*256.)/(5000.*1000000.));
-   printDateTimeFromEpoch((long long) UNIXTIME);
-   printf("UNIT is %d\n", UNIT);
-   printf("DEV  is %d\n",  DEV); 
-   printf("NINT is %d\n", NINT);
-   printf("%.2f %.2f %.2f %.2f\n",  (double)corr.Ihi/(double)corr.corrtime, \
-                                    (double)corr.Qhi/(double)corr.corrtime, \
-                                    (double)corr.Ilo/(double)corr.corrtime, \
-                                    (double)corr.Qlo/(double)corr.corrtime);
-   printf("nlags=%d\n", N);
-   printf("etaQ\t%.3f\n", 1/sqrt(P_I*P_Q));
-   printf("ETAQ\t%.3f\n\n", 1/sqrt(Ipwr*Qpwr));
+   if (!error){
+      //ouput stats for last spectra in file
+      printf("%s\n", query);
+      printf("\nUNIXTIME is %" PRIu64 "\n", UNIXTIME);
+      printf("CORRTIME is %.6f\n", (corr.corrtime*256.)/(5000.*1000000.));
+      printDateTimeFromEpoch((long long) UNIXTIME);
+      printf("UNIT is %d\n", UNIT);
+      printf("DEV  is %d\n",  DEV); 
+      printf("NINT is %d\n", NINT);
+      printf("%.2f %.2f %.2f %.2f\n",  (double)corr.Ihi/(double)corr.corrtime, \
+                                       (double)corr.Qhi/(double)corr.corrtime, \
+                                       (double)corr.Ilo/(double)corr.corrtime, \
+                                       (double)corr.Qlo/(double)corr.corrtime);
+      printf("nlags=%d\n", N);
+      printf("etaQ\t%.3f\n", 1/sqrt(P_I*P_Q));
+      printf("ETAQ\t%.3f\n\n", 1/sqrt(Ipwr*Qpwr));
 
-   // current scanID, and scanID used for cal
-   printf("The cal  is from scanID: %d\n", CALID);
-   printf("The THOT is from scanID: %d\n", THOTID);
-   printf("The data is from scanID: %d\n", scanID);
-   if( scanID==0 ){
-      printf("######################## ERROR ###########################\n");
-      printf("#                                                        #\n");
-      printf("#           Error, calibration was no good!              #\n");
-      printf("#                                                        #\n");
-      printf("######################## ERROR ###########################\n");
+      // current scanID, and scanID used for cal
+      printf("The cal  is from scanID: %d\n", CALID);
+      printf("The THOT is from scanID: %d\n", THOTID);
+      printf("The data is from scanID: %d\n", scanID);
    }
 
    //timing
@@ -1038,7 +1045,8 @@ void const callback(char *filein){
    int seconds = end.tv_sec - begin.tv_sec;
    int microseconds = end.tv_usec - begin.tv_usec;
    double elapsed = seconds + microseconds*1e-6;
-   printf("AVG FFTW %.1f ms in %d spectra\n\n", 1000.*elapsed/(sz/bps), sz/bps);
+   if (!error)
+      printf("AVG FFTW %.1f ms in %d spectra\n\n", 1000.*elapsed/(sz/bps), sz/bps);
    fflush(stdout);
 
    

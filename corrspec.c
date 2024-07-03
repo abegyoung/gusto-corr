@@ -156,7 +156,7 @@ int main(int argc, char **argv) {
 
    glob_t glob_result;
 
-   if(glob(argv[1], GLOB_NOSORT, NULL, &glob_result) != 0){
+   if(glob(argv[1], GLOB_ERR, NULL, &glob_result) != 0){
       perror("Error in glob\n");
       return 1;
    }
