@@ -15,7 +15,7 @@
 #include <fitsio.h>
 
 #define PI 3.14159
-#define BUFSIZE 128
+#define BUFSIZE 256
 #define DEBUG 0
 #define DOQC 1
 
@@ -38,6 +38,27 @@ void circularShiftLeft(float arr[], int size) {
 }
 
 
+void get_git_commit_info(const char *filename, char *commit_info) {
+    char command[BUFSIZ];
+    FILE *fp;
+    char hash[BUFSIZ], date[BUFSIZ];
+
+    // Construct the command to get the commit hash
+    snprintf(command, sizeof(command), "git log -1 --format=%%cd --date=format-local:'%%Y-%%m-%%d %%H:%%M:%%S %%Z' --pretty=format:\"Last commit %%h by %%an %%ad\" -- %s", filename);
+    fp = popen(command, "r");
+    if (fp == NULL) {
+        perror("popen");
+        exit(EXIT_FAILURE);
+    }
+    fgets(hash, sizeof(hash), fp);
+    pclose(fp);
+    hash[strcspn(hash, "\n")] = 0; // Remove trailing newline
+
+    // Combine hash and date into the commit_info string
+    snprintf(commit_info, BUFSIZ, "%s %s", filename, hash);
+}
+
+
 void append_to_fits_table(const char *filename, struct s_header *fits_header, double *array) {
     fitsfile *fptr;  // FITS file pointer
     int status = 0;  // CFITSIO status value MUST be initialized to zero!
@@ -45,6 +66,8 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
     long nrows;
     char extname[] = "DATA_TABLE";
     long n_elements = sizeof(array) / sizeof(array[0]);
+
+    char commit_info[256];
 
     // Try to open the FITS file in read/write mode. If it doesn't exist, create a new one.
     if (fits_open_file(&fptr, filename, READWRITE, &status)) {
@@ -61,17 +84,48 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
                 return;
             }
 
+	    // Create some Primary header keyword value pairs and fill them
+	    fits_write_key(fptr, TSTRING,   "OBJECT",   fits_header->target, "Name of the target object", &status);
+            fits_write_key(fptr, TSTRING,   "scantype", fits_header->type,   "Type of scan", &status);
+            fits_write_key(fptr, TINT,      "scanID",  &fits_header->scanID, "ID of scan", &status);
+            fits_write_key(fptr, TINT,      "CALID",   &fits_header->CALID,  "ID of correlator calibration", &status);
+            fits_write_key(fptr, TINT,      "IF",      &fits_header->IF,     "Frequency (MHz) of VLSR", &status);
+            fits_write_key(fptr, TFLOAT,    "VLSR",    &fits_header->VLSR,   "VLSR (km/s)", &status);
+
+	    // Create some Primary header comments and fill them
+	    get_git_commit_info("The Corrspec GUSTO pipeline is customizable combining raw spectrometer files and flight \
+			         houskeeping database into minimal header level0.5 baseband spectra or level0.7 full H/K\
+				 fits files. see github.com/abegyoung/gusto-corr for documentation", commit_info);
+	    if (fits_write_comment(fptr, commit_info, &status)) {
+	        fits_report_error(stderr, status);
+		return;
+	    }
+	    get_git_commit_info("corrspec.c", commit_info);
+	    if (fits_write_comment(fptr, commit_info, &status)) {
+	        fits_report_error(stderr, status);
+		return;
+	    }
+	    get_git_commit_info("callback.c", commit_info);
+	    if (fits_write_comment(fptr, commit_info, &status)) {
+	        fits_report_error(stderr, status);
+		return;
+	    }
+	    get_git_commit_info("influx.c", commit_info);
+	    if (fits_write_comment(fptr, commit_info, &status)) {
+	        fits_report_error(stderr, status);
+		return;
+	    }
+
             // Define the column parameters
             char *ttype[] ={"UNIT", "DEV", "NINT", "UNIXTIME", "FRAC", "NBYTES", "CORRTIME", "Ihigh", "Qhigh", \
-			    "Ilow", "Qlow", "Ierr", "Qerr", "VIhi", "VQhi", "VIlo", "VQlo", "scanID", "subScan", \
-		            "CALID", "THOT", "RA", "DEC", "IF", "VLSR", "scan_type", "filename", "target", "spec"};
+			    "Ilow", "Qlow", "Ierr", "Qerr", "VIhi", "VQhi", "VIlo", "VQlo", "subScan", \
+		            "THOT", "RA", "DEC", "filename", "spec"};
 
 	    // All header values are signed 32-bit except UNIXTIME which is uint64_t
-            char *tform[29];
+            char *tform[23];
 	    tform[0]  = "1J"; //int
 	    tform[1]  = "1J"; //int	
 	    tform[2]  = "1J"; //int
-	    //tform[3]  = "1W"; //u64	unixtime
 	    tform[3]  = "1J"; //int	unixtime
 	    tform[4]  = "1J"; //int
 	    tform[5]  = "1J"; //int
@@ -86,27 +140,21 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
             tform[14] = "1E"; //float	Vdac
             tform[15] = "1E"; //float	Vdac
             tform[16] = "1E"; //float	Vdac
-			      //
-            tform[17] = "1J"; //int	scanID
-            tform[18] = "1J"; //int	subScan
-            tform[19] = "1J"; //int	CALID
-            tform[20] = "1E"; //float	THOT
-			      //
-            tform[21] = "1E"; //float	RA
-            tform[22] = "1E"; //float	DEC
-            tform[23] = "1J"; //int  	IF
-            tform[24] = "1E"; //float	VLSR
-			      //
-	    tform[25] = "6A"; //char    scan type
-	    tform[26] = "48A";//char    filename
-	    tform[27] = "16A";//char    TARGET
-	    tform[28] = "1024E";
+	
+            tform[17] = "1J"; //int	subScan
+            tform[18] = "1E"; //float	THOT
 
-            char *tunit[29];
-	    for(int i=0; i<29; i++)
+            tform[19] = "1E"; //float	RA
+            tform[20] = "1E"; //float	DEC
+
+	    tform[21] = "48A";//char    filename
+	    tform[22] = "1024E";
+
+            char *tunit[23];
+	    for(int i=0; i<23; i++)
 	         tunit[i] = " ";
 
-	    int tfields = 29;
+	    int tfields = 23;
 
             // Create a binary table
             if (fits_create_tbl(fptr, BINARY_TBL, 0, tfields   , ttype, tform, tunit, extname, &status)) {
@@ -143,9 +191,7 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
     fits_write_col(fptr, TINT32BIT,  1, nrows+1 , 1, 1, &fits_header->unit,  &status);
     fits_write_col(fptr, TINT32BIT,  2, nrows+1 , 1, 1, &fits_header->dev,  &status);
     fits_write_col(fptr, TINT32BIT,  3, nrows+1 , 1, 1, &fits_header->nint,  &status);
-    //fits_write_col(fptr, TULONGLONG, 4, nrows+1 , 1, 1, &fits_header->unixtime, &status);
     fits_write_col(fptr, TINT32BIT,  4, nrows+1 , 1, 1, &fits_header->unixtime, &status);
-    ///fits_write_col(fptr, TINT32BIT,  5, nrows+1 , 1, 1, &fits_header->cpu,  &status);
     fits_write_col(fptr, TFLOAT,     5, nrows+1 , 1, 1, &fits_header->frac,  &status);
     fits_write_col(fptr, TINT32BIT,  6, nrows+1 , 1, 1, &fits_header->nbytes,  &status);
     fits_write_col(fptr, TFLOAT,     7, nrows+1 , 1, 1, &fits_header->corrtime,  &status);
@@ -162,21 +208,15 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
     fits_write_col(fptr, TFLOAT,    16, nrows+1,  1, 1, &fits_header->VIlo, &status);
     fits_write_col(fptr, TFLOAT,    17, nrows+1,  1, 1, &fits_header->VQlo, &status);
 									       
-    fits_write_col(fptr, TINT32BIT, 18, nrows+1,  1, 1, &fits_header->scanID, &status);
-    fits_write_col(fptr, TINT32BIT, 19, nrows+1,  1, 1, &fits_header->subScan, &status);
-    fits_write_col(fptr, TINT32BIT, 20, nrows+1,  1, 1, &fits_header->CALID, &status);
-    fits_write_col(fptr, TFLOAT,    21, nrows+1,  1, 1, &fits_header->THOT, &status);
-    fits_write_col(fptr, TFLOAT,    22, nrows+1,  1, 1, &fits_header->RA, &status);
-    fits_write_col(fptr, TFLOAT,    23, nrows+1,  1, 1, &fits_header->DEC, &status);
-    fits_write_col(fptr, TINT32BIT, 24, nrows+1,  1, 1, &fits_header->IF, &status);
-    fits_write_col(fptr, TFLOAT,    25, nrows+1,  1, 1, &fits_header->VLSR, &status);
+    fits_write_col(fptr, TINT32BIT, 18, nrows+1,  1, 1, &fits_header->subScan, &status);
+    fits_write_col(fptr, TFLOAT,    19, nrows+1,  1, 1, &fits_header->THOT, &status);
+    fits_write_col(fptr, TFLOAT,    20, nrows+1,  1, 1, &fits_header->RA, &status);
+    fits_write_col(fptr, TFLOAT,    21, nrows+1,  1, 1, &fits_header->DEC, &status);
 
-    fits_write_col(fptr, TSTRING,   26, nrows+1,  1, 1, &fits_header->type, &status);
-    fits_write_col(fptr, TSTRING,   27, nrows+1,  1, 1, &fits_header->filename, &status);
-    fits_write_col(fptr, TSTRING,   28, nrows+1,  1, 1, &fits_header->target, &status);
+    fits_write_col(fptr, TSTRING,   22, nrows+1,  1, 1, &fits_header->filename, &status);
 									     
     // Write the spectra as a single 1*1024 column
-    if (fits_write_col(fptr, TDOUBLE, 29, nrows+1 , 1, 1 * 1024, array, &status)) {
+    if (fits_write_col(fptr, TDOUBLE, 23, nrows+1 , 1, 1 * 1024, array, &status)) {
         fits_report_error(stderr, status);  // Print any error message
         return;
     }

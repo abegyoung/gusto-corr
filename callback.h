@@ -30,9 +30,7 @@ typedef struct s_header {
 	int		unit;
 	int		dev;
 	int		nint;
-	//uint64_t	unixtime;
 	int		unixtime;
-	//intat         cpu;
 	float           frac;
 	int		nbytes;
 	float		corrtime;
