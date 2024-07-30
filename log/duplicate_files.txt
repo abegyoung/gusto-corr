@@ -1,0 +1,113 @@
+-rw-r--r-- 1 young young   196280 Jun 10 12:54 series_09500_09503.tar.xz
+-rw-r--r-- 1 young young   195744 Jun 10 12:54 series_09500_09503.tar.xz-1706237823
+
+The only difference between these files is in the db.csv
+dat files and udp files are identical
+
+The first file has db.csv running scanID 9503-9503
+The second afile has db.csv running scanID 9499-9499
+There are only DAC voltages in these db.csv files.
+
+RESULT: Deleted -1706237823 file
+
+===============================================================================
+
+-rw-r--r-- 1 young young 17170408 Jun 10 12:36 tmp1/series_11349_11352.tar.xz
+-rw-r--r-- 1 young young 17170408 Jun 10 12:36 tmp2/series_11349_11352.tar.xz-1706509262
+
+These two files are identical
+diff of untarred directories show no differences
+
+RESULT: Deleted -1706509262 file
+
+===============================================================================
+
+-rw-r--r-- 1 young young 11199252 Jun 10 12:42 series_18309_18312.tar.xz
+-rw-r--r-- 1 young young 11226100 Jun 10 12:42 series_18309_18312.tar.xz-1707520387
+-rw-r--r-- 1 young young    36772 Jun 10 12:42 series_18309_18312.tar.xz-1708578335
+
+db.csv is missing from first file
+second file has complete dat, db.csv, and udp files
+third file has only udp file, identical to second and first files.
+
+RESULT: deleted first and third, kept second and renamed dropping -1707520387
+
+===============================================================================
+
+-rw-r--r-- 1 young young 15296268 Jun 10 12:45 series_24026_24029.tar.xz
+-rw-r--r-- 1 young young 15302880 Jun 10 12:45 series_24026_24029.tar.xz-1708239003
+
+only difference is db.csv.  dat and udp files identical
+second file has some scanID 24027 that the first doens't have.
+
+RESULT: using downloaded DB shards, deleted --1708239003
+
+
+Y===============================================================================
+-rw-r--r-- 1 young young  4931396 Jun 10 12:47 series_25881_25882.tar.xz
+-rw-r--r-- 1 young young  4747100 Jun 10 12:47 series_25881_25882.tar.xz-1708480504
+-rw-r--r-- 1 young young  3523172 Jun 10 12:47 series_25881_25882.tar.xz-1708480864
+
+first file seems to be complete, dat, db, udp.
+both second and third files are corrupted
+
+RESULT: deleted second and third files
+
+
+===============================================================================
+
+-rw-r--r-- 1 young young 11382472 Jun 10 12:47 series_26931_26934.tar.xz
+-rw-r--r-- 1 young young 11396912 Jun 10 12:47 series_26931_26934.tar.xz-1708642323
+
+differences are in db.csv
+first file has DAC voltages scanID 26934
+second file has 26930-26934 scanIDs DAC and HK
+
+RESULT: deleted first file and kept -1708642323 renaming to drop the extension
+
+===============================================================================
+
+-rw-r--r-- 1 young young 14108692 Jun 10 12:48 series_27660_27663.tar.xz
+-rw-r--r-- 1 young young 14155332 Jun 10 12:48 series_27660_27663.tar.xz-1708813083
+
+first file has one extra ACS data file
+differences between db.csv
+first db.csv file has only 27663 DAC voltages
+second db.csv file is substantially more complete
+
+RESULT: deleted second file and used DB shard
+
+
+
+
+
+
+===============================================================================
+===============================================================================
+
+early scanID 0-2200 bz2 files
+
+===============================================================================
+
+-rw-r--r-- 1 young young      370 Jun 10 12:43 series_02062_02110.tar.bz2
+-rw-r--r-- 1 young young    51236 Jun 10 12:43 series_02062_02110.tar.bz2-1705016583
+
+-rw-r--r-- 1 young young      106 Jun 10 12:44 series_02160_02208.tar.bz2
+-rw-r--r-- 1 young young    51790 Jun 10 12:44 series_02160_02208.tar.bz2-1705055163
+
+-rw-r--r-- 1 young young      106 Jun 10 12:44 series_02233_02236.tar.bz2
+-rw-r--r-- 1 young young  2091171 Jun 10 12:44 series_02233_02236.tar.bz2-1705057503
+
+-rw-r--r-- 1 young young      107 Jun 10 12:44 series_02253_02256.tar.bz2
+-rw-r--r-- 1 young young  2118781 Jun 10 12:44 series_02253_02256.tar.bz2-1705059123
+
+-rw-r--r-- 1 young young      107 Jun 10 12:45 series_02261_02264.tar.bz2
+-rw-r--r-- 1 young young  2037891 Jun 10 12:45 series_02261_02264.tar.bz2-1705059843
+
+-rw-r--r-- 1 young young      108 Jun 10 12:45 series_02265_02268.tar.bz2
+-rw-r--r-- 1 young young  2065167 Jun 10 12:45 series_02265_02268.tar.bz2-1705060864
+
+most of these first files are emtpy tars.
+
+RESULT: deleted first empty tar and renamed dropping -1705* extensions.
+
