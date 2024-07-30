@@ -30,8 +30,10 @@ typedef struct s_header {
 	int		unit;
 	int		dev;
 	int		nint;
-	uint64_t	unixtime;
-	int		cpu;
+	//uint64_t	unixtime;
+	int		unixtime;
+	//intat         cpu;
+	float           frac;
 	int		nbytes;
 	float		corrtime;
 	int		Ihi;
@@ -50,6 +52,8 @@ typedef struct s_header {
 	float		THOT;
 	float		RA;
 	float		DEC;
+	int  		IF;
+	float		VLSR;
 	char		*type;
 	char		*filename;
 	char		*target;

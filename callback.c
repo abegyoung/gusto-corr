@@ -62,16 +62,17 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
             }
 
             // Define the column parameters
-            char *ttype[] ={"UNIT", "DEV", "NINT", "UNIXTIME", "CPU", "NBYTES", "CORRTIME", "Ihigh", "Qhigh", \
+            char *ttype[] ={"UNIT", "DEV", "NINT", "UNIXTIME", "FRAC", "NBYTES", "CORRTIME", "Ihigh", "Qhigh", \
 			    "Ilow", "Qlow", "Ierr", "Qerr", "VIhi", "VQhi", "VIlo", "VQlo", "scanID", "subScan", \
-		            "CALID", "THOT", "RA", "DEC", "scan_type", "filename", "target", "spec"};
+		            "CALID", "THOT", "RA", "DEC", "IF", "VLSR", "scan_type", "filename", "target", "spec"};
 
 	    // All header values are signed 32-bit except UNIXTIME which is uint64_t
-            char *tform[26];
+            char *tform[29];
 	    tform[0]  = "1J"; //int
 	    tform[1]  = "1J"; //int	
 	    tform[2]  = "1J"; //int
-	    tform[3]  = "1W"; //u64	unixtime
+	    //tform[3]  = "1W"; //u64	unixtime
+	    tform[3]  = "1J"; //int	unixtime
 	    tform[4]  = "1J"; //int
 	    tform[5]  = "1J"; //int
 	    tform[6]  = "1E"; //float	corrtime
@@ -93,17 +94,19 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
 			      //
             tform[21] = "1E"; //float	RA
             tform[22] = "1E"; //float	DEC
+            tform[23] = "1J"; //int  	IF
+            tform[24] = "1E"; //float	VLSR
 			      //
-	    tform[23] = "6A"; //char    scan type
-	    tform[24] = "48A";//char    filename
-	    tform[25] = "16A";//char    TARGET
-	    tform[26] = "1024E";
+	    tform[25] = "6A"; //char    scan type
+	    tform[26] = "48A";//char    filename
+	    tform[27] = "16A";//char    TARGET
+	    tform[28] = "1024E";
 
-            char *tunit[27];
-	    for(int i=0; i<27; i++)
+            char *tunit[29];
+	    for(int i=0; i<29; i++)
 	         tunit[i] = " ";
 
-	    int tfields = 27;
+	    int tfields = 29;
 
             // Create a binary table
             if (fits_create_tbl(fptr, BINARY_TBL, 0, tfields   , ttype, tform, tunit, extname, &status)) {
@@ -140,8 +143,10 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
     fits_write_col(fptr, TINT32BIT,  1, nrows+1 , 1, 1, &fits_header->unit,  &status);
     fits_write_col(fptr, TINT32BIT,  2, nrows+1 , 1, 1, &fits_header->dev,  &status);
     fits_write_col(fptr, TINT32BIT,  3, nrows+1 , 1, 1, &fits_header->nint,  &status);
-    fits_write_col(fptr, TULONGLONG, 4, nrows+1 , 1, 1, &fits_header->unixtime, &status);
-    fits_write_col(fptr, TINT32BIT,  5, nrows+1 , 1, 1, &fits_header->cpu,  &status);
+    //fits_write_col(fptr, TULONGLONG, 4, nrows+1 , 1, 1, &fits_header->unixtime, &status);
+    fits_write_col(fptr, TINT32BIT,  4, nrows+1 , 1, 1, &fits_header->unixtime, &status);
+    ///fits_write_col(fptr, TINT32BIT,  5, nrows+1 , 1, 1, &fits_header->cpu,  &status);
+    fits_write_col(fptr, TFLOAT,     5, nrows+1 , 1, 1, &fits_header->frac,  &status);
     fits_write_col(fptr, TINT32BIT,  6, nrows+1 , 1, 1, &fits_header->nbytes,  &status);
     fits_write_col(fptr, TFLOAT,     7, nrows+1 , 1, 1, &fits_header->corrtime,  &status);
 
@@ -163,13 +168,15 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
     fits_write_col(fptr, TFLOAT,    21, nrows+1,  1, 1, &fits_header->THOT, &status);
     fits_write_col(fptr, TFLOAT,    22, nrows+1,  1, 1, &fits_header->RA, &status);
     fits_write_col(fptr, TFLOAT,    23, nrows+1,  1, 1, &fits_header->DEC, &status);
+    fits_write_col(fptr, TINT32BIT, 24, nrows+1,  1, 1, &fits_header->IF, &status);
+    fits_write_col(fptr, TFLOAT,    25, nrows+1,  1, 1, &fits_header->VLSR, &status);
 
-    fits_write_col(fptr, TSTRING,   24, nrows+1,  1, 1, &fits_header->type, &status);
-    fits_write_col(fptr, TSTRING,   25, nrows+1,  1, 1, &fits_header->filename, &status);
-    fits_write_col(fptr, TSTRING,   26, nrows+1,  1, 1, &fits_header->target, &status);
+    fits_write_col(fptr, TSTRING,   26, nrows+1,  1, 1, &fits_header->type, &status);
+    fits_write_col(fptr, TSTRING,   27, nrows+1,  1, 1, &fits_header->filename, &status);
+    fits_write_col(fptr, TSTRING,   28, nrows+1,  1, 1, &fits_header->target, &status);
 									     
     // Write the spectra as a single 1*1024 column
-    if (fits_write_col(fptr, TDOUBLE, 27, nrows+1 , 1, 1 * 1024, array, &status)) {
+    if (fits_write_col(fptr, TDOUBLE, 29, nrows+1 , 1, 1 * 1024, array, &status)) {
         fits_report_error(stderr, status);  // Print any error message
         return;
     }
@@ -299,7 +306,7 @@ void const callback(char *filein){
    int UNIT;
    int DEV;
    int NBYTES;
-   int CPU;
+   float FRAC;
    float dacV[4]; //0=VIhi, 1=VQhi, 2=VIlo, 3=VQlo
    float VIhi,  VQhi,  VIlo,  VQlo;
    float VIhi2, VQhi2, VIlo2, VQlo2;
@@ -313,7 +320,9 @@ void const callback(char *filein){
    float RA=0.;
    float DEC=0.;
    float THOT=0.;
-
+   int IF=0.;
+   float VLSR=0.;
+   char *TARGET = (char *)malloc(16);
 
    // notification
    printf("File changed: %s\n", filein);
@@ -339,6 +348,7 @@ void const callback(char *filein){
    int scanID  = -1;
    int CALID   = -1;
    int THOTID  = -1;
+   int TUNEID  = -1;
    int subScan = -1;
    bool error  = FALSE;
 
@@ -401,7 +411,7 @@ void const callback(char *filein){
    printf("File has %.1f spectra\n", (float)sz/bps);
 
    int32_t header[22];
-   const char *header_names[]={"UNIT", "DEV", "NINT", "UNIXTIME", "CPU", "NBYTES", "CORRTIME", \
+   const char *header_names[]={"UNIT", "DEV", "NINT", "UNIXTIME", "FRAC", "NBYTES", "CORRTIME", \
 			       "EMPTY", "Ihigh", "Qhigh", "Ilow", "Qlow", "Ierr", "Qerr"};
 
 //////////////////////////////  LOOP OVER ALL SPECTRA IN FILE  ///////////////////////////////////
@@ -445,7 +455,8 @@ void const callback(char *filein){
             //UNIXTIME is 64 bits
             fread(&value1, 4, 1, fp); //Least significant 32 bits
             fread(&value2, 4, 1, fp); //Most significant 32 bis
-            UNIXTIME = (((uint64_t)value2 << 32) | value1 ) / 1000.;
+            UNIXTIME = (((uint64_t)value2 << 32) | value1 ) / 1000.; //unixtime is to msec, store as 1sec int
+            FRAC     = (((uint64_t)value2 << 32) | value1 ) % 1000 ; //fractional part is 1msec
          }
          else{
             fread(&value, 4, 1, fp);
@@ -459,7 +470,7 @@ void const callback(char *filein){
       DEV           = header[1];
       NINT          = header[2];
       //UNIXTIME    = header[3]; 64 bits
-      CPU           = header[4];
+      //CPU           = header[4];
       NBYTES        = header[5];
       corr.corrtime = header[6];
       //EMPTY         header[7];
@@ -490,7 +501,22 @@ void const callback(char *filein){
       // hesperia DB = 28800
       // sculptor DB = 25200
       curl = init_influx();
-      sprintf(query, "&q=SELECT *   FROM \"udpPointing\" WHERE \"scanID\"=~/%d/ AND time>\%" PRIu64 "500000000 AND time<\%" PRIu64 "500000000", scanID, UNIXTIME-1-28800, UNIXTIME+0-28800);
+      sprintf(query, "&q=SELECT last(VLSR),* FROM \"tuning\" WHERE time<=\%" PRIu64 "000000000", UNIXTIME);
+      influxReturn = influxWorker(curl, query);
+      if(UNIT==6) //ACS5
+        IF   = influxReturn->value[1];
+      if(UNIT==4) //ACS3
+        IF   = influxReturn->value[2];
+      TARGET = influxReturn->text;
+      VLSR   = influxReturn->value[0];
+
+      TUNEID = influxReturn->scanID;
+
+      // RA, DEC from InfluxDB 0.5s ahead or behind time
+      // hesperia DB = 28800
+      // sculptor DB = 25200
+      curl = init_influx();
+      sprintf(query, "&q=SELECT * FROM \"udpPointing\" WHERE \"scanID\"=~/%d/ AND time>\%" PRIu64 "500000000 AND time<\%" PRIu64 "500000000", scanID, UNIXTIME-1-25200, UNIXTIME+0-25200);
       influxReturn = influxWorker(curl, query);
       DEC = influxReturn->value[0];
       RA  = influxReturn->value[1];
@@ -836,7 +862,7 @@ void const callback(char *filein){
          fprintf(errf, "%s\t", name);
          fflush(errf);
          fprintf(errf, "%" PRIu64 "\t", UNIXTIME);
-         fprintf(errf, "%u\t", CPU);
+         fprintf(errf, "%u\t", CPU); //CPU => FRAC
          fprintf(errf, "%s\t", prefix);
          fprintf(errf, "%d\t%d\t", UNIT, DEV);
          fprintf(errf, "%.6f\t", (corr.corrtime*256.)/(5000.*1000000.));
@@ -900,8 +926,8 @@ void const callback(char *filein){
       fits_header->unit     = UNIT;
       fits_header->dev      = DEV;
       fits_header->nint     = NINT;
-      fits_header->unixtime = UNIXTIME;
-      fits_header->cpu      = CPU;
+      fits_header->unixtime = (int) UNIXTIME;
+      fits_header->frac     = FRAC;
       fits_header->nbytes   = NBYTES;
       fits_header->corrtime = (corr.corrtime*256.)/(5000.*1000000.);
 
@@ -923,12 +949,12 @@ void const callback(char *filein){
       fits_header->THOT     = THOT;
       fits_header->RA       = RA;
       fits_header->DEC      = DEC;
+      fits_header->IF       = IF;
+      fits_header->VLSR     = VLSR;
 
       strcpy(fits_header->type, prefix);
-      //strcpy(fits_header->filename, "ACS3_OTF_14755_0000.dat");
-      printf("%s\n", name);
       strcpy(fits_header->filename, name);
-      strcpy(fits_header->target, "TARGETNAME");
+      strcpy(fits_header->target, TARGET);
       
       // Construct the FITS DATA
       double array[1024];
@@ -1025,8 +1051,7 @@ void const callback(char *filein){
 		    
    if (!error){
       //ouput stats for last spectra in file
-      printf("%s\n", query);
-      printf("\nUNIXTIME is %" PRIu64 "\n", UNIXTIME);
+      printf("UNIXTIME is %" PRIu64 "\n", UNIXTIME);
       printf("CORRTIME is %.6f\n", (corr.corrtime*256.)/(5000.*1000000.));
       printDateTimeFromEpoch((long long) UNIXTIME);
       printf("UNIT is %d\n", UNIT);
@@ -1041,9 +1066,13 @@ void const callback(char *filein){
       printf("ETAQ\t%.3f\n\n", 1/sqrt(Ipwr*Qpwr));
 
       // current scanID, and scanID used for cal
-      printf("The cal  is from scanID: %d\n", CALID);
-      printf("The THOT is from scanID: %d\n", THOTID);
-      printf("The data is from scanID: %d\n", scanID);
+      printf("The cal    is from scanID: %d\n", CALID);
+      printf("The THOT   is from scanID: %d\n", THOTID);
+      printf("The data   is from scanID: %d\n", scanID);
+      printf("The tuning is from scanID: %d\n", TUNEID);
+      printf("\tIF   = %d MHz\n", IF);
+      printf("\tVLSR = %.0f MHz\n", VLSR);
+      printf("\tTRGET= %s\n", TARGET);
    }
 
    //timing

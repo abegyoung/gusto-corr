@@ -53,11 +53,16 @@ void extract_substring(char *source, char *start_str, char end_char, int occurre
 // Callback function to handle the response from the InfluxDB server
 size_t write_callback(char *contents, size_t size, size_t nmemb, void *userp) {
 
+    //DEBUG
+    //printf("%s\n", contents);
+
     size_t realsize = size * nmemb;
 
-    int time_indx = 0;
-    int scan_indx = 0;
-    int col_indx = 0;
+    // Parser column indicies
+    int time_indx = 0;  // column containing time
+    int scan_indx = 0;  // column containing scanID
+    int text_indx = 0;  // column containing any text values (TARGET NAME)
+
     int pos = 0;	//token count
     char *token;
     char ID[32]="";
@@ -99,6 +104,9 @@ size_t write_callback(char *contents, size_t size, size_t nmemb, void *userp) {
         if(!strcmp(ID, "scanID"))
             scan_indx = pos;
 
+        if(!strcmp(ID, "TARGET"))
+            text_indx = pos;
+
         token = strtok(NULL, ",");
         pos++;
     }
@@ -108,6 +116,13 @@ size_t write_callback(char *contents, size_t size, size_t nmemb, void *userp) {
     influxReturn = malloc(sizeof(*influxReturn));
     influxReturn->length = nmeas * (ncols-2);
     influxReturn->value = (float *)malloc(nmeas*(ncols-2) * sizeof(float));
+    //chars time[64] and text[64] are pre-allocated
+
+    // Set all struct values to 0, just in case we don't get any returns from influxDB
+    //memset(&influxReturn, 0, sizeof(influxReturn));
+    for (int i=0; i<influxReturn->length; i++){
+	    influxReturn->value[i] = 0.;
+    }
 
 
     // Parse the InfluxDB return string 
@@ -120,26 +135,39 @@ size_t write_callback(char *contents, size_t size, size_t nmemb, void *userp) {
         while (token != NULL ){
 
 	        if(pos == time_indx){
-                    //printf("time is %s\n", token);
+                        //DEBUG
+                        //printf("time is %s\n", token);
 	        }
     
 	        else if(pos == scan_indx){
 	                memset(ID, '\0', sizeof(ID));
 		        strncpy(ID, token+1, strlen(token)-2);
-		        influxReturn->scanID = atof(ID);
+		        influxReturn->scanID = atoi(ID);
+                        //DEBUG
 		        //printf("scanID string = %s\n", ID);
+	        }
+
+	        else if(pos == text_indx){
+	                memset(ID, '\0', sizeof(ID));
+		        strncpy(ID, token+1, strlen(token)-2);
+			strcpy(influxReturn->text, ID);
+                        //DEBUG
+		        //printf("text string = %s\n", ID);
 	        }
 
 	        else{
 		        strncpy(data, token, strlen(token));
 		        influxReturn->value[data_indx] = atof(data);
-		        //printf("data string = %s\n", data);
+                        //DEBUG
+		        //printf("data string %d = %s\n", data_indx, data);
 		        data_indx++;
 	        }
 	        pos++;
                 token = strtok(NULL, ",");
         }
     }
+    //DEBUG
+    //printf("\n");
 
     return realsize;
 
