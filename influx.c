@@ -11,6 +11,50 @@
 //double influx_return;
 influxStruct *influxReturn=NULL;
 
+void extract_all_keyword_values(const char *source, const char *keyword) {
+    const char *found = source;
+    char result[64];
+    int result_size = sizeof(result);
+    int i=0;
+    char ID[32]="";
+
+    // Loop until no more keywords are found
+    while ((found = strstr(found, keyword)) != NULL) {
+        // Move the pointer to the position after the keyword
+        found += strlen(keyword);
+
+        // Check if the next character is a quote
+        if (*found == '"') {
+            found++; // Move past the starting quote
+
+            // Find the ending quote
+            const char *end = strchr(found, '"');
+            if (end) {
+                // Calculate the length of the string inside the quotes
+                size_t length = end - found;
+
+                // Ensure we don't copy more than result_size - 1 characters
+                if (length >= result_size) {
+                    length = result_size - 1;
+                }
+
+                // Copy the string inside the quotes to the result buffer
+                strncpy(result, found, length);
+                result[length] = '\0'; // Null-terminate the result
+
+                // Print the extracted value
+	        memset(ID, '\0', sizeof(ID));
+		strncpy(ID, result, strlen(result));
+		strncpy(influxReturn->name[i], ID, sizeof(ID));
+                //printf("Extracted value: %d %s\n", i, result);
+		//printf("stored value: %d %s\n", i, influxReturn->name[i]);
+            }
+        }
+        i++;
+    }
+}
+
+
 int countString(const char *haystack, const char *needle){
 	int count = 0;
 	const char *tmp = haystack;
@@ -56,12 +100,14 @@ size_t write_callback(char *contents, size_t size, size_t nmemb, void *userp) {
     //DEBUG
     //printf("%s\n", contents);
 
+
     size_t realsize = size * nmemb;
 
     // Parser column indicies
     int time_indx = 0;  // column containing time
     int scan_indx = 0;  // column containing scanID
     int text_indx = 0;  // column containing any text values (TARGET NAME)
+    int name_indx = 0;  // column containing scanID
 
     int pos = 0;	//token count
     char *token;
@@ -116,7 +162,14 @@ size_t write_callback(char *contents, size_t size, size_t nmemb, void *userp) {
     influxReturn = malloc(sizeof(*influxReturn));
     influxReturn->length = nmeas * (ncols-2);
     influxReturn->value = (float *)malloc(nmeas*(ncols-2) * sizeof(float));
-    //chars time[64] and text[64] are pre-allocated
+
+    influxReturn->name   = (char **)malloc(nmeas*(ncols-2) * sizeof(char *));
+
+    for(int i=0; i<nmeas*(ncols-2); i++)
+	    influxReturn->name[i] = (char *)malloc(64*sizeof(char));
+    
+    // load names into allocated space for names
+    extract_all_keyword_values(contents, "name\":");
 
     // Set all struct values to 0, just in case we don't get any returns from influxDB
     //memset(&influxReturn, 0, sizeof(influxReturn));
@@ -176,6 +229,7 @@ size_t write_callback(char *contents, size_t size, size_t nmemb, void *userp) {
 
 void freeinfluxStruct(influxStruct *influxReturn) {
    free(influxReturn->value);
+   free(influxReturn->name);
    free(influxReturn);
 }
 

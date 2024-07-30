@@ -15,6 +15,7 @@ typedef struct
   int16_t  scanID;
   float    *value;
   char     text[64];
+  char     **name;
 } influxStruct;
 extern influxStruct *influxReturn;
 

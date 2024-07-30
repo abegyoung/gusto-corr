@@ -34,8 +34,13 @@ corrspec: corrspec.c corrspec.h callback.c callback.h influx.c influx.h
 	$(CXX) -c influx.c $(INCLUDES) $(CFLAGS) $(LIBS)
 	$(CXX) -o corrspec corrspec.o callback.o influx.o $(INCLUDES) $(CFLAGS) $(LIBS)
 
-all: corrspec
+influx_reader: influx_reader.c influx.c influx.h
+	$(CXX) -c influx_reader.c $(INCLUDES) $(CFLAGS) $(LIBS)
+	$(CXX) -c influx.c $(INCLUDES) $(CFLAGS) $(LIBS)
+	$(CXX) -o influx_reader influx_reader.o influx.o $(INCLUDES) $(CFLAGS) $(LIBS)
+
+all: corrspec influx_reader
 
 clean:
-	rm corrspec *.o
+	rm corrspec influx_reader *.o
 
