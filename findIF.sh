@@ -17,6 +17,9 @@ while read -r line; do
         ## Find the TARGET name
         TARGET=$(echo "$prev2" | awk '{print $10}')              # Target name
         VLSR=$(grep "$TARGET" GUSTO.cat | awk '{print $5*1000}') # VLSR in m/s
+        VLSRkm=$(grep "$TARGET" GUSTO.cat | awk '{print $5}')    # VLSR in km/s
+	date_str=$(echo "$prev2" | cut -c 1-20)                  # timedate
+	epoch_sec=$(date -d "$date_str" +%s)
         gonVel=$(echo "$line" | awk '{print $8*1000}')           # gonVel in m/s
         read -r next_line
 
@@ -51,7 +54,7 @@ while read -r line; do
         #fi
 
         if [[ $scanID != 0 && $scanID != 1 ]] ; then
-          printf '%d\t%d\t%d\t%s\n' $IF1 $IF2 $scanID $TARGET
+          printf '%d\t%d\t%d\t%.1f\t%d\t%s\n' $epoch_sec $IF1 $IF2 $VLSRkm $scanID $TARGET
         fi
     fi
 done < ICEobs.log
