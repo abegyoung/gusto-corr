@@ -59,13 +59,17 @@ void get_git_commit_info(const char *filename, char *commit_info) {
 }
 
 
-void append_to_fits_table(const char *filename, struct s_header *fits_header, double *array) {
+void append_to_fits_table(const char *filename, struct s_header *fits_header, double *array, int THOTID) {
     fitsfile *fptr;  // FITS file pointer
     int status = 0;  // CFITSIO status value MUST be initialized to zero!
     int hdutype;
     long nrows;
     char extname[] = "DATA_TABLE";
     long n_elements = sizeof(array) / sizeof(array[0]);
+
+    CURL *curl;
+    char *query = malloc(BUFSIZ);
+    char *buf;
 
     char commit_info[256];
 
@@ -84,13 +88,33 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
                 return;
             }
 
-	    // Create some Primary header keyword value pairs and fill them
+	    // Create some Primary header keyword value pairs and fill them from the current fits_header struct
 	    fits_write_key(fptr, TSTRING,   "OBJECT",   fits_header->target, "Name of the target object", &status);
             fits_write_key(fptr, TSTRING,   "scantype", fits_header->type,   "Type of scan", &status);
             fits_write_key(fptr, TINT,      "scanID",  &fits_header->scanID, "ID of scan", &status);
             fits_write_key(fptr, TINT,      "CALID",   &fits_header->CALID,  "ID of correlator calibration", &status);
             fits_write_key(fptr, TINT,      "IF",      &fits_header->IF,     "Frequency (MHz) of VLSR", &status);
             fits_write_key(fptr, TFLOAT,    "VLSR",    &fits_header->VLSR,   "VLSR (km/s)", &status);
+
+	    // We only want to fill the primary header once, so don't bother with the fits_header struct, 
+	    // just get directly from influx
+	    curl = init_influx();
+            sprintf(query, "&q=SELECT * FROM /^HK_TEMP*/ WHERE scanID=~/%d/", THOTID);
+            influxReturn = influxWorker(curl, query);
+            fits_write_key(fptr, TINT,    "HKscanID",    &THOTID,   "Last H/K measurement", &status);
+	    for(int i=0; i<influxReturn->length; i++){
+               fits_write_key(fptr, TFLOAT, influxReturn->name[i], &influxReturn->value[i], "Celsius", &status);
+	    }
+
+	        // example for getting all bias values from a HOT scanID
+            curl = init_influx();
+            sprintf(query, "&q=SELECT (*) FROM /^biasCurB1M2|biasCurB1M3|biasCurB1M6/ WHERE scanID=~/10039/");
+            //sprintf(query, "&q=SELECT (*) FROM /^biasCurB2M2|biasCurB2M5|biasCurB2M8/ WHERE scanID=~/10039/");
+            influxReturn = influxWorker(curl, query);
+	    for(int i=0; i<influxReturn->length; i++){
+               fits_write_key(fptr, TFLOAT, influxReturn->name[i], &influxReturn->value[i], "microAmps", &status);
+	    }
+
 
 	    // Create some Primary header comments and fill them
 	    get_git_commit_info("The Corrspec GUSTO pipeline is customizable combining raw spectrometer files and flight \
@@ -537,9 +561,7 @@ void const callback(char *filein){
 	 //continue;
       }
 
-      // RA, DEC from InfluxDB 0.5s ahead or behind time
-      // hesperia DB = 28800
-      // sculptor DB = 25200
+      // Last VLSR tuning from InfluxDB anytime before current obs time 
       curl = init_influx();
       sprintf(query, "&q=SELECT last(VLSR),* FROM \"tuning\" WHERE time<=\%" PRIu64 "000000000", UNIXTIME);
       influxReturn = influxWorker(curl, query);
@@ -549,7 +571,6 @@ void const callback(char *filein){
         IF   = influxReturn->value[2];
       TARGET = influxReturn->text;
       VLSR   = influxReturn->value[0];
-
       TUNEID = influxReturn->scanID;
 
       // RA, DEC from InfluxDB 0.5s ahead or behind time
@@ -1007,7 +1028,7 @@ void const callback(char *filein){
       sprintf(fitsfile, "ACS%d_%s_%05d.fits", UNIT-1, prefix, scanID);
       if (DEBUG)
          printf("%s\n", fitsfile);
-      append_to_fits_table(fitsfile, fits_header, array);
+      append_to_fits_table(fitsfile, fits_header, array, THOTID);
 
 
       // Free items before next spectra within this file

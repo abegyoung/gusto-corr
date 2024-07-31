@@ -26,14 +26,21 @@ int main(int argc, char **argv) {
     */
 
     // example for getting all HK_TEMP values from a HOT scanID
-    curl = init_influx();
-    sprintf(query, "&q=SELECT * FROM /^HK_TEMP*/ WHERE scanID=~/10039/");
-    influxReturn = influxWorker(curl, query);
-    printf("length = %d\n", influxReturn->length);
+    //curl = init_influx();
+    //sprintf(query, "&q=SELECT * FROM /^HK_TEMP*/ WHERE scanID=~/10039/");
+    //influxReturn = influxWorker(curl, query);
+    //printf("length = %ld\n", influxReturn->length);
+    //for(int i=0; i<influxReturn->length; i++)
+    //  printf("%s %.1f\n", influxReturn->name[i], influxReturn->value[i]);
 
+    // example for getting all bias values from a HOT scanID
+    curl = init_influx();
+    sprintf(query, "&q=SELECT (*) FROM /^biasCurB1M2|biasCurB1M3|biasCurB1M6/ WHERE scanID=~/10039/");
+    //sprintf(query, "&q=SELECT (*) FROM /^biasCurB2M2|biasCurB2M5|biasCurB2M8/ WHERE scanID=~/10039/");
+    influxReturn = influxWorker(curl, query);
+    printf("length = %ld\n", influxReturn->length);
     for(int i=0; i<influxReturn->length; i++)
       printf("%s %.1f\n", influxReturn->name[i], influxReturn->value[i]);
-
 
     return 0;
 }

@@ -100,7 +100,6 @@ size_t write_callback(char *contents, size_t size, size_t nmemb, void *userp) {
     //DEBUG
     //printf("%s\n", contents);
 
-
     size_t realsize = size * nmemb;
 
     // Parser column indicies
@@ -167,7 +166,7 @@ size_t write_callback(char *contents, size_t size, size_t nmemb, void *userp) {
 
     for(int i=0; i<nmeas*(ncols-2); i++)
 	    influxReturn->name[i] = (char *)malloc(64*sizeof(char));
-    
+
     // load names into allocated space for names
     extract_all_keyword_values(contents, "name\":");
 
