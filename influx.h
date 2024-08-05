@@ -16,6 +16,7 @@ typedef struct
   float    *value;
   char     text[64];
   char     **name;
+  char     **cols;
 } influxStruct;
 extern influxStruct *influxReturn;
 

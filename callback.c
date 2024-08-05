@@ -55,7 +55,7 @@ void get_git_commit_info(const char *filename, char *commit_info) {
     hash[strcspn(hash, "\n")] = 0; // Remove trailing newline
 
     // Combine hash and date into the commit_info string
-    snprintf(commit_info, BUFSIZ, "%s %s", filename, hash);
+    snprintf(commit_info, BUFSIZ+sizeof(filename), "%s %s", filename, hash);
 }
 
 
@@ -94,27 +94,115 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
             fits_write_key(fptr, TINT,      "scanID",  &fits_header->scanID, "ID of scan", &status);
             fits_write_key(fptr, TINT,      "CALID",   &fits_header->CALID,  "ID of correlator calibration", &status);
             fits_write_key(fptr, TINT,      "IF",      &fits_header->IF,     "Frequency (MHz) of VLSR", &status);
+            fits_write_key(fptr, TFLOAT,    "LO",      &fits_header->LO,     "Synth (MHz)", &status);
             fits_write_key(fptr, TFLOAT,    "VLSR",    &fits_header->VLSR,   "VLSR (km/s)", &status);
 
 	    // We only want to fill the primary header once, so don't bother with the fits_header struct, 
-	    // just get directly from influx
-	    curl = init_influx();
-            sprintf(query, "&q=SELECT * FROM /^HK_TEMP*/ WHERE scanID=~/%d/", THOTID);
-            influxReturn = influxWorker(curl, query);
+	    // which is per extension table row, just get directly from influx now
             fits_write_key(fptr, TINT,    "HKscanID",    &THOTID,   "Last H/K measurement", &status);
-	    for(int i=0; i<influxReturn->length; i++){
-               fits_write_key(fptr, TFLOAT, influxReturn->name[i], &influxReturn->value[i], "Celsius", &status);
-	    }
 
-	        // example for getting all bias values from a HOT scanID
-            curl = init_influx();
-            sprintf(query, "&q=SELECT (*) FROM /^biasCurB1M2|biasCurB1M3|biasCurB1M6/ WHERE scanID=~/10039/");
-            //sprintf(query, "&q=SELECT (*) FROM /^biasCurB2M2|biasCurB2M5|biasCurB2M8/ WHERE scanID=~/10039/");
+	    // Ambient HK_TEMP           0          1          2          3          4          5          6          7          8          9          10         11         12         13         14         15
+            const char *hktemp_names[]={"CRADLE02","CRYCSEBK","CRYOPORT","CALMOTOR","CRADLE03","QAVCCTRL","COOLRTRN","FERADIAT","CRYCSEFT","CRADLE04","CONELOAD","OAVCCTRL","COOLSUPL","CRADLE01","EQUILREF","SECONDRY"};
+	    curl = init_influx();
+            sprintf(query, "&q=SELECT * FROM /^HK_TEMP*/ WHERE scanID=~/%d/ LIMIT 1", THOTID);
             influxReturn = influxWorker(curl, query);
-	    for(int i=0; i<influxReturn->length; i++){
-               fits_write_key(fptr, TFLOAT, influxReturn->name[i], &influxReturn->value[i], "microAmps", &status);
-	    }
+	    if(influxReturn->length != 16)
+	       printf(" ************ length is %ld should by 16 HKTEMP scanID %d ****************\n", influxReturn->length, THOTID);
+	    for(int i=0; i<influxReturn->length; i++)
+               fits_write_key(fptr, TFLOAT, hktemp_names[i], &influxReturn->value[i], "Ambient temps (C)", &status);
+            freeinfluxStruct(influxReturn);
 
+	    
+	    // LO AD590                  0          1          10         11         2          3          4          5          6          7          8          9 
+            const char *b1temp_names[]={"UNUSED  ","B1_MLSE ","B1POWER3","B1POWER4","UNUSED  ","UNUSED  ","B1CH5SPK","UNUSED  ","UNUSED  ","UNUSED  ","B1POWER1","B1POWER2"};
+            const char *b2temp_names[]={"B2INTRN1","B2INTRN2","B2POWER3","B2POWER4","UNUNSED ","UNUSED  ","UNUSED  ","B2AVA183","B1CH5MLT","B2CH5SPK","B2POWER1","B2POWER2"};
+	    curl = init_influx();
+            sprintf(query, "&q=SELECT * FROM /^B1_AD590*/ WHERE scanID=~/%d/ LIMIT 1", THOTID);
+            influxReturn = influxWorker(curl, query);
+	    if(influxReturn->length != 12)
+	       printf(" ************ length is %ld should by 12 LOTEMP scanID %d ****************\n", influxReturn->length, THOTID);
+	    for(int i=0; i<influxReturn->length; i++)
+               fits_write_key(fptr, TFLOAT, b1temp_names[i], &influxReturn->value[i], "LO Ambient temps (C)", &status);
+            freeinfluxStruct(influxReturn);
+
+	    curl = init_influx();
+            sprintf(query, "&q=SELECT * FROM /^B2_AD590*/ WHERE scanID=~/%d/ LIMIT 1", THOTID);
+            influxReturn = influxWorker(curl, query);
+	    if(influxReturn->length != 12)
+	       printf(" ************ length is %ld should by 12 LOTEMP scanID %d ****************\n", influxReturn->length, THOTID);
+	    for(int i=0; i<influxReturn->length; i++)
+               fits_write_key(fptr, TFLOAT, b2temp_names[i], &influxReturn->value[i], "LO Ambient temps (C)", &status);
+            freeinfluxStruct(influxReturn);
+
+	    
+	    // LO Drive currents
+	    curl = init_influx();
+            const char *b1psat_names[]={"PSATB1M2", "PSATB1M3", "PSATB1M6"};
+            const char *b2psat_names[]={"PSATB2M2", "PSATB2M5", "PSATB2M8"};
+            if(fits_header->unit==6){ //ACS5 B1
+               sprintf(query, "&q=SELECT * FROM /^PSatI_B1M2|PSatI_B1M3|PSatI_B1M6/ WHERE scanID=~/%d/ LIMIT 1", THOTID);
+               influxReturn = influxWorker(curl, query);
+	       if(influxReturn->length != 3)
+	          printf(" ************ length is %ld should by 3 PSAT scanID %d ****************\n", influxReturn->length, THOTID);
+	       for(int i=0; i<influxReturn->length; i++)
+                  fits_write_key(fptr, TFLOAT, b1psat_names[i], &influxReturn->value[i], "LO Drive Currents (Amps)", &status);
+	    }
+            if(fits_header->unit==4){ //ACS3 B2
+               sprintf(query, "&q=SELECT * FROM /^PSatI_B2M2|PSatI_B2M5|PSatI_B2M8/ WHERE scanID=~/%d/ LIMIT 1", THOTID);
+               influxReturn = influxWorker(curl, query);
+	       if(influxReturn->length != 3)
+	          printf(" ************ length is %ld should by 3 PSAT scanID %d ****************\n", influxReturn->length, THOTID);
+	       for(int i=0; i<influxReturn->length; i++)
+                  fits_write_key(fptr, TFLOAT, b2psat_names[i], &influxReturn->value[i], "LO Drive Currents (Amps)", &status);
+	    }
+            freeinfluxStruct(influxReturn);
+
+	    // HEB Mixer Currents
+	    curl = init_influx();
+            const char *b1Imon_names[]={"IMONB1M2","IMONB1M3","IMONB1M6"};
+            const char *b2Imon_names[]={"IMONB2M2","IMONB2M5","IMONB2M8"};
+            if(fits_header->unit==6){ //ACS5 B1
+               sprintf(query, "&q=SELECT * FROM /^biasCurB1M2|biasCurB1M3|biasCurB1M6/ WHERE scanID=~/%d/ LIMIT 1", THOTID);
+               influxReturn = influxWorker(curl, query);
+	       if(influxReturn->length != 3)
+	          printf(" ************ length is %ld should by 3 HEB scanID %d ****************\n", influxReturn->length, THOTID);
+	       for(int i=0; i<influxReturn->length; i++)
+                  fits_write_key(fptr, TFLOAT, b1Imon_names[i], &influxReturn->value[i], "Mixer Currents (mA)", &status);
+	    }
+            if(fits_header->unit==4){ //ACS3 B2
+               sprintf(query, "&q=SELECT * FROM /^biasCurB2M2|biasCurB2M5|biasCurB2M8/ WHERE scanID=~/%d/ LIMIT 1", THOTID);
+               influxReturn = influxWorker(curl, query);
+	       if(influxReturn->length != 3)
+	          printf(" ************ length is %ld should by 3 HEB scanID %d ****************\n", influxReturn->length, THOTID);
+	       for(int i=0; i<influxReturn->length; i++)
+                  fits_write_key(fptr, TFLOAT, b2Imon_names[i], &influxReturn->value[i], "Mixer Currents (mA)", &status);
+	    }
+            freeinfluxStruct(influxReturn);
+
+	    // LO Gate Monitor
+	    curl = init_influx();
+            const char *gate_names[]={"GATEMON1","GATEMON2","GATEMON3","GATEMON4","GATEMON5","GATEMON6","GATEMON7","GATEMON8"};
+            if(fits_header->unit==6) //ACS5 B1
+               sprintf(query, "&q=SELECT * FROM /^B1_GMON_*/ WHERE scanID=~/%d/ LIMIT 1", THOTID);
+            if(fits_header->unit==4) //ACS3 B2
+               sprintf(query, "&q=SELECT * FROM /^B2_GMON_*/ WHERE scanID=~/%d/ LIMIT 1", THOTID);
+            influxReturn = influxWorker(curl, query);
+	    if(influxReturn->length != 8)
+	       printf(" ************ length is %ld should by 8 gate scanID %d ****************\n", influxReturn->length, THOTID);
+	    for(int i=0; i<influxReturn->length; i++)
+               fits_write_key(fptr, TFLOAT, gate_names[i], &influxReturn->value[i], "LO Gate Monitor (Amps)", &status);
+            freeinfluxStruct(influxReturn);
+
+	    // Cryogenic temps
+	    curl = init_influx();
+            const char *cryo_names[]={"IS", "IVCS", "LNA", "MIXER","OS", "OVCS", "QCL", "TANK"};
+            sprintf(query, "&q=SELECT * FROM /^DT670*/ WHERE scanID=~/%d/ LIMIT 1", THOTID);
+            influxReturn = influxWorker(curl, query);
+	    if(influxReturn->length != 8)
+	       printf(" ************ length is %ld should by 8 cryo scanID %d ****************\n", influxReturn->length, THOTID);
+	    for(int i=0; i<influxReturn->length; i++)
+               fits_write_key(fptr, TFLOAT, cryo_names[i], &influxReturn->value[i], "Cryogenic temps (K)", &status);
+            freeinfluxStruct(influxReturn);
 
 	    // Create some Primary header comments and fill them
 	    get_git_commit_info("The Corrspec GUSTO pipeline is customizable combining raw spectrometer files and flight \
@@ -386,6 +474,7 @@ void const callback(char *filein){
    float THOT=0.;
    int IF=0.;
    float VLSR=0.;
+   float LO=0.;
    char *TARGET = (char *)malloc(16);
 
    // notification
@@ -565,10 +654,14 @@ void const callback(char *filein){
       curl = init_influx();
       sprintf(query, "&q=SELECT last(VLSR),* FROM \"tuning\" WHERE time<=\%" PRIu64 "000000000", UNIXTIME);
       influxReturn = influxWorker(curl, query);
-      if(UNIT==6) //ACS5
-        IF   = influxReturn->value[1];
-      if(UNIT==4) //ACS3
-        IF   = influxReturn->value[2];
+      if(UNIT==6){ //ACS5 B1
+         IF   = influxReturn->value[1];
+         LO   = influxReturn->value[3];
+      }
+      if(UNIT==4){ //ACS3 B2
+         IF   = influxReturn->value[2];
+         LO   = influxReturn->value[4];
+      }
       TARGET = influxReturn->text;
       VLSR   = influxReturn->value[0];
       TUNEID = influxReturn->scanID;
@@ -664,6 +757,9 @@ void const callback(char *filein){
       else if (NBYTES==2112)
          N = 128;
       int specA = (int) N/128 - 1;
+
+      // Since we know UNIT and NLAGS, set correlator frequency and fits spectrum for later use
+
 
       //We don't know the lag # until we open the file, so malloc now
       corr.II   = malloc(N*sizeof(int32_t));   //Uncorrected ints
@@ -1011,6 +1107,7 @@ void const callback(char *filein){
       fits_header->RA       = RA;
       fits_header->DEC      = DEC;
       fits_header->IF       = IF;
+      fits_header->LO       = LO;  
       fits_header->VLSR     = VLSR;
 
       strcpy(fits_header->type, prefix);
@@ -1132,7 +1229,7 @@ void const callback(char *filein){
       printf("The data   is from scanID: %d\n", scanID);
       printf("The tuning is from scanID: %d\n", TUNEID);
       printf("\tIF   = %d MHz\n", IF);
-      printf("\tVLSR = %.0f MHz\n", VLSR);
+      printf("\tVLSR = %.0f km/s\n", VLSR);
       printf("\tTRGET= %s\n", TARGET);
    }
 

@@ -51,6 +51,7 @@ typedef struct s_header {
 	float		RA;
 	float		DEC;
 	int  		IF;
+	float		LO;
 	float		VLSR;
 	char		*type;
 	char		*filename;
