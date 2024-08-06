@@ -24,21 +24,21 @@ while read -r line; do
         read -r next_line
 
         LO1=$(echo "$next_line" | awk '{print $6}' | cut -c 2- ) #LO in MHz
-        LO1=$(echo "$LO1 * 1000000" | bc)  #LO in 1/s
+        #LO1=$(echo "$LO1 * 1000000" | bc)  #LO in 1/s
         read -r next_line
 
         LO2=$(echo "$next_line" | awk '{print $6}' | cut -c 2- ) #LO in MHz
-        LO2=$(echo "$LO2 * 1000000" | bc)  #LO in 1/s
+        #LO2=$(echo "$LO2 * 1000000" | bc)  #LO in 1/s
         read -r next_line
         read -r next_line
         read -r next_line
 
         scanID=$(echo "$next_line" | awk '{print $10}' ) #scanID
 
-        IF1=$(echo "$f1 * (1 - 1*($VLSR+$gonVel)/$c) - $LO1*108" | bc -l) #IF in 1/s
+        IF1=$(echo "$f1 * (1 - 1*($VLSR+$gonVel)/$c) - $LO1*108*1000000" | bc -l) #IF in 1/s
         IF1=$(echo "$IF1 / 1000000" | bc )  #IF in MHz
         IF1=$(echo "$IF1" | awk '{print int(($1+5)/10)*10}')
-        IF2=$(echo "$f2 * (1 - 1*($VLSR+$gonVel)/$c) - $LO2*144" | bc -l) #IF in 1/s
+        IF2=$(echo "$f2 * (1 - 1*($VLSR+$gonVel)/$c) - $LO2*144*1000000" | bc -l) #IF in 1/s
         IF2=$(echo "$IF2 / 1000000" | bc )  #IF in MHz
         IF2=$(echo "$IF1" | awk '{print int(($1+5)/10)*10}')
 
@@ -54,7 +54,7 @@ while read -r line; do
         #fi
 
         if [[ $scanID != 0 && $scanID != 1 ]] ; then
-          printf '%d\t%d\t%d\t%.1f\t%d\t%s\n' $epoch_sec $IF1 $IF2 $VLSRkm $scanID $TARGET
+          printf '%d\t%d\t%d\t%.1f\t%d\t%s\t%.6f\t%.6f\n' $epoch_sec $IF1 $IF2 $VLSRkm $scanID $TARGET $LO1 $LO2
         fi
     fi
 done < ICEobs.log
