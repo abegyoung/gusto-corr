@@ -617,6 +617,14 @@ void const callback(char *filein){
       corr.Ierr     = header[12];
       corr.Qerr     = header[13];
 
+      // Since we know UNIT and NLAGS, set correlator frequency and fits spectrum for later use
+      if(UNIT==6){ //ACS5 B1
+         FS_FREQ = 5000.;
+      }
+      if(UNIT==4){ //ACS3 B2
+         FS_FREQ = 5000.;
+      }
+
       // Indication that this is a broken header file from correlator STOP signal
       if (corr.Ierr!=0 || corr.Qerr!=0 || \
            corr.Ihi==0 ||  corr.Qhi==0 || corr.Ilo==0 || corr.Qlo==0 || \
@@ -735,14 +743,6 @@ void const callback(char *filein){
       else if (NBYTES==2112)
          N = 128;
       int specA = (int) N/128 - 1;
-
-      // Since we know UNIT and NLAGS, set correlator frequency and fits spectrum for later use
-      if(UNIT==6){ //ACS5 B1
-         FS_FREQ = 5000.;
-      }
-      if(UNIT==4){ //ACS3 B2
-         FS_FREQ = 5000.;
-      }
 
 
       //We don't know the lag # until we open the file, so malloc now
