@@ -10,19 +10,19 @@
 
 192.168.1.203
 GUSTO spectrometer software, TRUNK (Oct 24 2023, 13:17:58)
-/flash/rc.local has: /flash/gusto --unit 4 --fs 5000 --lags 1024 --K2V1 10034.8 --M2V1 3269.0 &
+/flash/rc.local has: /flash/gusto --unit 3 --fs 5000 --lags 1024 --K2V1 10034.8 --M2V1 3269.0 &
 
 192.168.1.204
 GUSTO spectrometer software, TRUNK (Oct 24 2023, 13:17:58)
-/flash/rc.local has: /flash/gusto --unit 5 --fs 5000 --lags 1024 --K2V1 10058.6 --M2V1 3289.4 &
+/flash/rc.local has: /flash/gusto --unit 4 --fs 5000 --lags 1024 --K2V1 10058.6 --M2V1 3289.4 &
 
 192.168.1.205
 GUSTO spectrometer software, TRUNK (Oct 24 2023, 13:17:58)
-/flash/rc.local has: /flash/gusto --unit 6 --fs 5000 --lags 1024 --K2V1 5988.5 --M2V1 1971.3 &
+/flash/rc.local has: /flash/gusto --unit 5 --fs 5000 --lags  512 --K2V1 5988.5  --M2V1 1971.3 &
 
 192.168.1.206
 GUSTO spectrometer software, TRUNK (Oct 24 2023, 13:17:58)
-/flash/rc.local has: /flash/gusto --unit 7 --fs 5000 --lags 1024 --K2V1 9919.6 --M2V1 3302.4 &
+/flash/rc.local has: /flash/gusto --unit 6 --fs 5000 --lags 1024 --K2V1 9919.6  --M2V1 3302.4 &
 
 
 
