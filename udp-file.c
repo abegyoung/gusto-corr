@@ -139,14 +139,14 @@ int main(int argc, char **argv) {
         memcpy(&pos.telescope.y,         buffer+140, sizeof(double));
         memcpy(&pos.telescope.z,         buffer+148, sizeof(double));
 
-        printf("%d.%d\t",   pos.here.now.tv_sec, pos.here.now.tv_nsec);
+        printf("%ld.%ld\t",   pos.here.now.tv_sec, pos.here.now.tv_nsec);
         //printf("GONDOLA_ALT= %f\n",pos.here.altitude);
         //printf("LONG= %f\n", RAD2DEG*pos.here.longitude);
         //printf("LAT= %f\n",  RAD2DEG*pos.here.latitude);
         printf("%f\t",   pos.here.altitude);
         printf("%f\t",   RAD2DEG*pos.here.latitude);
         printf("%f\t",   RAD2DEG*pos.here.longitude);
-        correctPrecession(&pos.here.ra, &pos.here.dec, pos.here.now.tv_sec);
+        //correctPrecession(&pos.here.ra, &pos.here.dec, pos.here.now.tv_sec);
         //printf("RA= %s\t",   rad2hms(pos.here.ra));
         //printf("LAT= %s\n",rad2dms(pos.here.dec));
         printf("%f\t",   RAD2DEG*pos.here.ra);
