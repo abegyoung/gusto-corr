@@ -1,0 +1,34 @@
+B1/B2 LO AD590s in order as read from InfluxDB (alphabetical by name)
+
+                                        Proposed	Proposed
+      Meas Name        scanID  value    FITS KEY	FITS Desc
+------------------------------------------------------------------------------------
+name: B1_AD590_0	7756   -273	UNUSED		UNUSED
+name: B1_AD590_1	7756   6.55	B1_SYNTH	B1 MLSE
+name: B1_AD590_10	7756   19.053	B1_Pwr_3	B1 Pwr Internal 3
+name: B1_AD590_11	7756   19.303	B1_Pwr_4	B1 Pwr Internal 4
+name: B1_AD590_2	7756   -272.95	UNUSED		UNUSED
+name: B1_AD590_3	7756   -273	UNUSED		UNUSED
+name: B1_AD590_4	7756   4.15	B1M5_AMP	B1 LO Spacek amplifer Ch5
+name: B1_AD590_5	7756   -273	UNUSED		UNUSED
+name: B1_AD590_6	7756   -273	UNUSED		UNUSED
+name: B1_AD590_7	7756   -273	UNUSED		UNUSED
+name: B1_AD590_8	7756   18.077	B1_Pwr_1	B1 Pwr Internal 1
+name: B1_AD590_9	7756   18.547	B1_Pwr_2	B1 Pwr Internal 2
+
+name: B2_AD590_0	7756   9.706	B2_uCTRL	B2 MK66FX uCTRL
+name: B2_AD590_1	7756   14.025	B2MLTDRV	B2 Mult Driver
+name: B2_AD590_10	7756   17.002	B2_Pwr_3	B2 Pwr Internal 3
+name: B2_AD590_11	7756   18.669	B2_Pwr_4	B2 Pwr Internal 4
+name: B2_AD590_2	7756   -272.931	UNUSED		UNUSED
+name: B2_AD590_3	7756   -273	UNUSED		UNUSED
+name: B2_AD590_4	7756   -273	UNUSED		UNUSED
+name: B2_AD590_5	7756   11.4	B2AVA183	B2 LO X-band Amplifier
+name: B2_AD590_6	7756   3.413	B1M5MULT	B1 LO final tripler Ch5
+name: B2_AD590_7	7756   4.55	B2M5_AMP	B2Ch5Spacek
+name: B2_AD590_8	7756   17.497	B2_Pwr_1	B2 Pwr Internal 1
+name: B2_AD590_9	7756   15.739	B2_Pwr_2	B2 Pwr Internal 2
+
+
+
+
