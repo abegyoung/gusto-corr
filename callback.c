@@ -1,3 +1,4 @@
+#define _XOPEN_SOURCE
 #include <inttypes.h>
 #include <sys/time.h>
 #include <time.h>
@@ -18,7 +19,6 @@
 #define BUFSIZE 256
 #define DEBUG 0
 #define DOQC 1
-
 
 // Function to perform circular shift by -1  [UNUSED]
 // functionally identical to the even/odd IQ[i+1] scheme
@@ -61,6 +61,7 @@ void get_git_commit_info(const char *filename, char *commit_info) {
 
 void append_to_fits_table(const char *filename, struct s_header *fits_header, double *array, int THOTID) {
     fitsfile *fptr;  // FITS file pointer
+		     //
     int status = 0;  // CFITSIO status value MUST be initialized to zero!
     int hdutype;
     int array_length;
@@ -74,9 +75,14 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
 
     char commit_info[256];
 
+    int IF_index, LO_index;
     float crpix = 0.;
     float crval = 0.;
     float cdelt;
+    char line[4];
+    float linefreq;
+    int band, npix;
+    int syntmult;
 
     // Try to open the FITS file in read/write mode. If it doesn't exist, create a new one.
     if (fits_open_file(&fptr, filename, READWRITE, &status)) {
@@ -95,121 +101,142 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
 
             // Construct the primary FITS HEADER
 
+	    // Various indices and keywords in the primary header that depend on Band #
+            if (fits_header->unit == 6){ //ACS5 B1
+               IF_index = 0;
+               LO_index = 2;
+	       cdelt = 5000./511.;
+	       strcpy(line, "NII");
+	       linefreq = 1461132.000000; //MHz
+	       band = 1;
+	       npix = 512;
+	       syntmult = 108;
+            }
+            if (fits_header->unit == 4){ //ACS3 B2
+               IF_index = 1;
+               LO_index = 3;
+	       cdelt = 5000./1023.;
+	       strcpy(line, "CII");
+	       linefreq = 1900536.9000000; //MHz
+	       band = 2;
+	       npix = 1024;
+	       syntmult = 144;
+            }
+
 	    // Create some Primary header keyword value pairs and fill them from the current fits_header struct
-	    fits_write_key(fptr, TSTRING,   "OBJECT",   fits_header->target, "Name of the target object", &status);
-            fits_write_key(fptr, TSTRING,   "scantype", fits_header->type,   "Type of scan", &status);
-            fits_write_key(fptr, TINT,      "scanID",  &fits_header->scanID, "ID of scan", &status);
             fits_write_key(fptr, TINT,      "CALID",   &fits_header->CALID,  "ID of correlator calibration", &status);
-            fits_write_key(fptr, TINT,      "IF",      &fits_header->IF,     "Frequency (MHz) of VLSR", &status);
-            fits_write_key(fptr, TFLOAT,    "LO",      &fits_header->LO,     "Synth (MHz)", &status);
-            fits_write_key(fptr, TFLOAT,    "VLSR",    &fits_header->VLSR,   "VLSR (km/s)", &status);
 
 	    // Spectral scaling
-            if(fits_header->unit==6){ //ACS5 B1
-	       cdelt = 5000./512.;
-	    }
-            if(fits_header->unit==4){ //ACS3 B2
-	       cdelt = 5000./1024.;
-	    }
-            fits_write_key(fptr, TSTRING,   "CUNIT1",  "MHz",  "Spectral unit",    &status);
-            fits_write_key(fptr, TFLOAT,    "CRPIX1",  &crpix,  "Index location", &status);
+            fits_write_key(fptr, TSTRING,   "CUNIT1",  "MHz",   "Spectral unit",          &status);
+            fits_write_key(fptr, TFLOAT,    "CRPIX1",  &crpix,  "Index location",         &status);
             fits_write_key(fptr, TFLOAT,    "CRVAL1",  &crval,  "Start of spectra (MHz)", &status);
-            fits_write_key(fptr, TFLOAT,    "CDELT1",  &cdelt,  "Channel width (MHz)", &status);
+            fits_write_key(fptr, TFLOAT,    "CDELT1",  &cdelt,  "Channel width (MHz)",    &status);
 
 
 	    // We only want to fill the primary header once, so don't bother with the fits_header struct, 
 	    // which is per extension table row, just get directly from influx now
 	    // Note: This is a pretty high overhead task talking to the InfluxDB, but we only need to do it once per file
-            fits_write_key(fptr, TINT,    "HKscanID",    &THOTID,   "Last H/K measurement", &status);
+            fits_write_key(fptr, TINT,    "HKSCANID",  &THOTID,   "nearest H/K measurement", &status);
+	    // new items 8-14
+            fits_write_key(fptr, TSTRING, "TELESCOP",  "GUSTO",   "", &status);
+            fits_write_key(fptr, TSTRING, "LINE",      &line,     "", &status);
+            fits_write_key(fptr, TFLOAT,  "LINEFREQ",  &linefreq, "", &status);
+            fits_write_key(fptr, TINT,    "BAND",      &band,     "GUSTO band #",     &status);
+            fits_write_key(fptr, TINT,    "NPIX",      &npix,     "N spec pixels",    &status);
+            fits_write_key(fptr, TSTRING, "DLEVEL",    "0.7",      "data level",      &status);
+            fits_write_key(fptr, TSTRING, "Proctime",  "20240814_1652",  "processing time", &status);
 
 	    // Ambient HK_TEMP           0          1          2          3          4          5          6          7          
             const char *hktemp_names[]={"CRADLE02","CRYCSEBK","CRYOPORT","CALMOTOR","CRADLE03","QAVCCTRL","COOLRTRN","FERADIAT", \
 		                        "CRYCSEFT","CRADLE04","CONELOAD","OAVCCTRL","COOLSUPL","CRADLE01","EQUILREF","SECONDRY"};
 	                              // 8          9          10         11         12         13         14         15
+            const char *hktemp_descs[]={""};
 	    curl = init_influx();
-            sprintf(query, "&q=SELECT * FROM /^HK_TEMP*/ WHERE scanID=~/%d/ LIMIT 1", THOTID);
+            sprintf(query, "&q=SELECT * FROM /^HK_TEMP*/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
             influxReturn = influxWorker(curl, query);
-	    for(int i=0; i<influxReturn->length; i++)
-               fits_write_key(fptr, TFLOAT, hktemp_names[i], &influxReturn->value[i], "Ambient temps (C)", &status);
+	    for (int i=0; i<influxReturn->length; i++){
+	       if( strcmp(hktemp_names[i], "CONELOAD"))
+                   fits_write_key(fptr, TFLOAT, hktemp_names[i], &influxReturn->value[i], "Ambient temps (C)", &status);
+	    }
             freeinfluxStruct(influxReturn);
 
 	    
 	    // LO AD590                  0          1          10         11         2          3          
-            const char *b1temp_names[]={"UNUSED  ","B1_MLSE ","B1POWER3","B1POWER4","UNUSED  ","UNUSED  ", \
-		                        "B1CH5SPK","UNUSED  ","UNUSED  ","UNUSED  ","B1POWER1","B1POWER2"};
-            const char *b2temp_names[]={"B2INTRN1","B2INTRN2","B2POWER3","B2POWER4","UNUNSED ","UNUSED  ", \
+            const char *lotemp_names[]={"UNUSED  ","B1_MLSE ","B1POWER3","B1POWER4","UNUSED  ","UNUSED  ", \
+		                        "B1CH5SPK","UNUSED  ","UNUSED  ","UNUSED  ","B1POWER1","B1POWER2", \
+                                        "B2INTRN1","B2INTRN2","B2POWER3","B2POWER4","UNUNSED ","UNUSED  ", \
 		                        "UNUSED  ","B2AVA183","B1CH5MLT","B2CH5SPK","B2POWER1","B2POWER2"};
                                       // 4          5          6          7          8          9 
+            const char *lotemp_descs[]={"UNUSED", \
+		                        "B1 LO Synthsizer 1", \
+		                        "B1 LO Pwr Box 3", \
+		                        "B1 LO Pwr Box 4", \
+		                        "UNUSED", \
+		                        "UNUSED", \
+		                        "B1 LO Spacek amplifier Ch5", \
+		                        "UNUSED", \
+		                        "UNUSED", \
+		                        "UNUSED", \
+		                        "B1 LO Pwr Box 1", \
+		                        "B1 LO Pwr Box 2", \
+		                        "B2 LO Pwr Box 1",
+		                        "B2 LO CTRL 1", \
+		                        "B2 LO CTRL 2", \
+		                        "B2 LO Pwr 3", \
+		                        "B2 LO Pwr 4", \
+		                        "UNUSED", \
+		                        "UNUSED", \
+		                        "B2 LO X-band Amplifier", \
+		                        "B1 LO final tripler Ch5", \
+		                        "B2 LO LO Spacek amplifier Ch5", \
+		                        "B2 LO Pwr 1", \
+		                        "B2 LO Pwr 2"};
 	    curl = init_influx();
-            sprintf(query, "&q=SELECT * FROM /^B1_AD590*/ WHERE scanID=~/%d/ LIMIT 1", THOTID);
+            sprintf(query, "&q=SELECT * FROM /^B1_AD590_*|B2_AD590_*/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
             influxReturn = influxWorker(curl, query);
-	    for(int i=0; i<influxReturn->length; i++)
-               fits_write_key(fptr, TFLOAT, b1temp_names[i], &influxReturn->value[i], "LO Ambient temps (C)", &status);
-            freeinfluxStruct(influxReturn);
-
-	    curl = init_influx();
-            sprintf(query, "&q=SELECT * FROM /^B2_AD590*/ WHERE scanID=~/%d/ LIMIT 1", THOTID);
-            influxReturn = influxWorker(curl, query);
-	    for(int i=0; i<influxReturn->length; i++)
-               fits_write_key(fptr, TFLOAT, b2temp_names[i], &influxReturn->value[i], "LO Ambient temps (C)", &status);
-            freeinfluxStruct(influxReturn);
-
-	    
-	    // LO Drive currents
-	    curl = init_influx();
-            const char *b1psat_names[]={"PSATB1M2", "PSATB1M3", "PSATB1M6"};
-            const char *b2psat_names[]={"PSATB2M2", "PSATB2M5", "PSATB2M8"};
-            if(fits_header->unit==6){ //ACS5 B1
-               sprintf(query, "&q=SELECT * FROM /^PSatI_B1M2|PSatI_B1M3|PSatI_B1M6/ WHERE scanID=~/%d/ LIMIT 1", THOTID);
-               influxReturn = influxWorker(curl, query);
-	       for(int i=0; i<influxReturn->length; i++)
-                  fits_write_key(fptr, TFLOAT, b1psat_names[i], &influxReturn->value[i], "LO Drive Currents (Amps)", &status);
+	    for (int i=0; i<influxReturn->length; i++){
+	       if( strcmp(lotemp_names[i], "UNUSED"))
+                  fits_write_key(fptr, TFLOAT, lotemp_names[i], &influxReturn->value[i], lotemp_descs[i], &status);
 	    }
-            if(fits_header->unit==4){ //ACS3 B2
-               sprintf(query, "&q=SELECT * FROM /^PSatI_B2M2|PSatI_B2M5|PSatI_B2M8/ WHERE scanID=~/%d/ LIMIT 1", THOTID);
-               influxReturn = influxWorker(curl, query);
-	       for(int i=0; i<influxReturn->length; i++)
-                  fits_write_key(fptr, TFLOAT, b2psat_names[i], &influxReturn->value[i], "LO Drive Currents (Amps)", &status);
-	    }
-            freeinfluxStruct(influxReturn);
-
-	    // HEB Mixer Currents
-	    curl = init_influx();
-            const char *b1Imon_names[]={"IMONB1M2","IMONB1M3","IMONB1M6"};
-            const char *b2Imon_names[]={"IMONB2M2","IMONB2M5","IMONB2M8"};
-            if(fits_header->unit==6){ //ACS5 B1
-               sprintf(query, "&q=SELECT * FROM /^biasCurB1M2|biasCurB1M3|biasCurB1M6/ WHERE scanID=~/%d/ LIMIT 1", THOTID);
-               influxReturn = influxWorker(curl, query);
-	       for(int i=0; i<influxReturn->length; i++)
-                  fits_write_key(fptr, TFLOAT, b1Imon_names[i], &influxReturn->value[i], "Mixer Currents (mA)", &status);
-	    }
-            if(fits_header->unit==4){ //ACS3 B2
-               sprintf(query, "&q=SELECT * FROM /^biasCurB2M2|biasCurB2M5|biasCurB2M8/ WHERE scanID=~/%d/ LIMIT 1", THOTID);
-               influxReturn = influxWorker(curl, query);
-	       for(int i=0; i<influxReturn->length; i++)
-                  fits_write_key(fptr, TFLOAT, b2Imon_names[i], &influxReturn->value[i], "Mixer Currents (mA)", &status);
-	    }
-            freeinfluxStruct(influxReturn);
-
-	    // LO Gate Monitor
-	    curl = init_influx();
-            const char *gate_names[]={"GATEMON1","GATEMON2","GATEMON3","GATEMON4","GATEMON5","GATEMON6","GATEMON7","GATEMON8"};
-            if(fits_header->unit==6) //ACS5 B1
-               sprintf(query, "&q=SELECT * FROM /^B1_GMON_*/ WHERE scanID=~/%d/ LIMIT 1", THOTID);
-            if(fits_header->unit==4) //ACS3 B2
-               sprintf(query, "&q=SELECT * FROM /^B2_GMON_*/ WHERE scanID=~/%d/ LIMIT 1", THOTID);
-            influxReturn = influxWorker(curl, query);
-	    for(int i=0; i<influxReturn->length; i++)
-               fits_write_key(fptr, TFLOAT, gate_names[i], &influxReturn->value[i], "LO Gate Monitor (Amps)", &status);
             freeinfluxStruct(influxReturn);
 
 	    // Cryogenic temps
+            const char *cryo_descs[]=  {"temp inner shield (K)", \
+		                        "temp inner vapor shield (K)", \
+		                        "temp LNA (K)", \
+		                        "temp mixers (K)", \
+		                        "temp outer shield (K)", \
+		                        "temp outer vapor shield (K)", \
+		                        "temp QCL (K)", \
+		                        "temp liquid-He tank (K)"};
 	    curl = init_influx();
-            const char *cryo_names[]={"IS", "IVCS", "LNA", "MIXER","OS", "OVCS", "QCL", "TANK"};
-            sprintf(query, "&q=SELECT * FROM /^DT670*/ WHERE scanID=~/%d/ LIMIT 1", THOTID);
+            sprintf(query, "&q=SELECT * FROM \"udpPointing\" WHERE scanID=~/^%d/ LIMIT 1", THOTID);
             influxReturn = influxWorker(curl, query);
-	    for(int i=0; i<influxReturn->length; i++)
+            fits_write_key(fptr, TFLOAT, "GOND_ALT", &influxReturn->value[0], "Gondola altitude (m)", &status);
+            fits_write_key(fptr, TFLOAT, "GOND_LAT", &influxReturn->value[4], "Gondola latitude (deg)", &status);
+            fits_write_key(fptr, TFLOAT, "GOND_LON", &influxReturn->value[5], "Gondola longitude (deg)", &status);
+            fits_write_key(fptr, TFLOAT, "ELEVATON", &influxReturn->value[3], "Pointing Elevation (deg)", &status);
+            freeinfluxStruct(influxReturn);
+
+	    // Geographic location and AZ EL pointing
+	    curl = init_influx();
+            const char *cryo_names[]={"T_IS", "T_IVCS", "T_LNA", "T_MIXER","T_OS", "T_OVCS", "T_QCL", "T_TANK"};
+            sprintf(query, "&q=SELECT * FROM /^DT670*/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
+            influxReturn = influxWorker(curl, query);
+	    for (int i=0; i<influxReturn->length; i++)
                fits_write_key(fptr, TFLOAT, cryo_names[i], &influxReturn->value[i], "Cryogenic temps (K)", &status);
+            freeinfluxStruct(influxReturn);
+
+            // Last VLSR tuning from InfluxDB anytime before current obs time 
+            // primary header telemetry objects
+            curl = init_influx();
+            sprintf(query, "&q=SELECT * FROM \"tuning\" WHERE time<=%d000000000 ORDER BY time DESC LIMIT 1" , fits_header->unixtime);
+            influxReturn = influxWorker(curl, query);
+	    fits_write_key(fptr, TSTRING,"OBJECT", &influxReturn->text,            "Name of the target object", &status);
+            fits_write_key(fptr, TFLOAT, "IF0",     &influxReturn->value[IF_index], "Frequency (MHz) of VLSR", &status);
+            fits_write_key(fptr, TFLOAT, "SYNTFREQ",     &influxReturn->value[LO_index], "Synth (MHz)", &status);
+            fits_write_key(fptr, TINT,   "SYNTMULT",     &syntmult, "Synth Multiplier", &status);
+            fits_write_key(fptr, TFLOAT, "VLSR",   &influxReturn->value[4],        "Commanded VLSR (km/s)", &status);
             freeinfluxStruct(influxReturn);
 
 	    // Create some Primary header comments and fill them
@@ -236,50 +263,60 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
 		return;
 	    }
 
+
             // Define the column parameters
-            char *ttype[] ={"UNIT", "DEV", "NINT", "UNIXTIME", "FRAC", "NBYTES", "CORRTIME", "Ihigh", "Qhigh", \
-			    "Ilow", "Qlow", "Ierr", "Qerr", "VIhi", "VQhi", "VIlo", "VQlo", "subScan", \
-		            "THOT", "RA", "DEC", "filename", "spec"};
+            char *ttype[] ={"UNIT", "DEV", "NINT", "UNIXTIME", "FRAC", "NBYTES", "CORRTIME", "INTTIME", "Ihigh", "Qhigh", \
+			    "Ilow", "Qlow", "Ierr", "Qerr", "VIhi", "VQhi", "VIlo", "VQlo", "scanID", "subScan", \
+		            "scan_type", "THOT", "RA", "DEC", "filename", "PSat", "Imon", "Gmon", "spec"};
+
+            char *tunit[] ={" ", " ", " ", "sec", "1/10 sec", " ", " ", "sec", "counts", "counts", \
+			    "counts", "counts", " ", " ", "Volts", "Volts", "Volts", "Volts", " ", \
+		            " ", " ", "Kelvin", "degrees", "degrees", "text", "Amps", "uA", "Amps", " "};
 
 	    // All header values are signed 32-bit except UNIXTIME which is uint64_t
-            char *tform[23];
-	    tform[0]  = "1J"; //int
-	    tform[1]  = "1J"; //int	
-	    tform[2]  = "1J"; //int
+            char *tform[29];
+	    tform[0]  = "1J"; //int	unit
+	    tform[1]  = "1J"; //int	dev
+	    tform[2]  = "1J"; //int	nint
 	    tform[3]  = "1J"; //int	unixtime
-	    tform[4]  = "1J"; //int
-	    tform[5]  = "1J"; //int
-	    tform[6]  = "1E"; //float	corrtime
-            tform[7]  = "1J"; //int
-            tform[8]  = "1J"; //int
-            tform[9]  = "1J"; //int
-            tform[10] = "1J"; //int
-            tform[11] = "1J"; //int
-            tform[12] = "1J"; //int
-            tform[13] = "1E"; //float	Vdac
+	    tform[4]  = "1J"; //int	frac
+	    tform[5]  = "1J"; //int	nbytes
+	    tform[6]  = "1J"; //int     corrtime
+	    tform[7]  = "1E"; //float   integration time
+            tform[8]  = "1J"; //int	ihi
+            tform[9]  = "1J"; //int	qhi
+            tform[10] = "1J"; //int	ilo
+            tform[11] = "1J"; //int	qlo
+            tform[12] = "1J"; //int	ierr
+            tform[13] = "1J"; //int	qerr
             tform[14] = "1E"; //float	Vdac
             tform[15] = "1E"; //float	Vdac
             tform[16] = "1E"; //float	Vdac
-            tform[17] = "1J"; //int	subScan
-            tform[18] = "1E"; //float	THOT
-            tform[19] = "1E"; //float	RA
-            tform[20] = "1E"; //float	DEC
-	    tform[21] = "48A";//char    filename
-            if(fits_header->unit==6){ //ACS5 B1
-	       tform[22] = "512E";
+            tform[17] = "1E"; //float	Vdac
+            tform[18] = "1J"; //int	scanID
+            tform[19] = "1J"; //int	subScan
+            tform[20] = "6A"; //char    scan type
+            tform[21] = "1E"; //float	THOT
+            tform[22] = "1E"; //float	RA
+            tform[23] = "1E"; //float	DEC
+	    tform[24] = "48A";//char    filename
+            tform[25] = "1E"; //float	PSat
+            tform[26] = "1E"; //float	Imon
+	    tform[27] = "1E"; //float   Gmon
+	    // Various indices and keywords in the per row header that depend on Band #
+            if (fits_header->unit==6){ //ACS5 B1
+	       tform[28] = "512E";
+               array_length=512;
 	    }
-            if(fits_header->unit==4){ //ACS3 B2
-	       tform[22] = "1024E";
+            if (fits_header->unit==4){ //ACS3 B2
+	       tform[28] = "1024E";
+               array_length=1024;
 	    }
 
-            char *tunit[23];
-	    for(int i=0; i<23; i++)
-	         tunit[i] = " ";
-
-	    int tfields = 23;
+	    int tfields = 29;
 
             // Create a binary table
-            if (fits_create_tbl(fptr, BINARY_TBL, 0, tfields   , ttype, tform, tunit, extname, &status)) {
+            if (fits_create_tbl(fptr, BINARY_TBL, 0, tfields ,ttype, tform, tunit, extname, &status)) {
                 fits_report_error(stderr, status);  // Print any error message
                 return;
             }
@@ -288,7 +325,7 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
             fits_report_error(stderr, status);  // Print any error message
             return;
         }
-    }
+    } ////////// END PRIMARY HEADER SECTION //////////
     
 
     // Move to the named HDU (where the table is stored)
@@ -310,45 +347,50 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
     }
 
     // Write the header data
-    fits_write_col(fptr, TINT32BIT,  1, nrows+1 , 1, 1, &fits_header->unit,  &status);
-    fits_write_col(fptr, TINT32BIT,  2, nrows+1 , 1, 1, &fits_header->dev,  &status);
-    fits_write_col(fptr, TINT32BIT,  3, nrows+1 , 1, 1, &fits_header->nint,  &status);
-    fits_write_col(fptr, TINT32BIT,  4, nrows+1 , 1, 1, &fits_header->unixtime, &status);
-    fits_write_col(fptr, TFLOAT,     5, nrows+1 , 1, 1, &fits_header->frac,  &status);
-    fits_write_col(fptr, TINT32BIT,  6, nrows+1 , 1, 1, &fits_header->nbytes,  &status);
-    fits_write_col(fptr, TFLOAT,     7, nrows+1 , 1, 1, &fits_header->corrtime,  &status);
+    fits_write_col(fptr, TINT32BIT,  1, nrows+1, 1, 1, &fits_header->unit,     &status);
+    fits_write_col(fptr, TINT32BIT,  2, nrows+1, 1, 1, &fits_header->dev,      &status);
+    fits_write_col(fptr, TINT32BIT,  3, nrows+1, 1, 1, &fits_header->nint,     &status);
+    fits_write_col(fptr, TINT32BIT,  4, nrows+1, 1, 1, &fits_header->unixtime, &status);
+    fits_write_col(fptr, TFLOAT,     5, nrows+1, 1, 1, &fits_header->frac,     &status);
+    fits_write_col(fptr, TINT32BIT,  6, nrows+1, 1, 1, &fits_header->nbytes,   &status);
+    fits_write_col(fptr, TINT32BIT,  7, nrows+1, 1, 1, &fits_header->corrtime, &status);
+    fits_write_col(fptr, TFLOAT,     8, nrows+1, 1, 1, &fits_header->inttime,  &status);
 
-    fits_write_col(fptr, TINT32BIT,  8, nrows+1 , 1, 1, &fits_header->Ihi,  &status);
-    fits_write_col(fptr, TINT32BIT,  9, nrows+1 , 1, 1, &fits_header->Qhi, &status);
-    fits_write_col(fptr, TINT32BIT, 10, nrows+1 , 1, 1, &fits_header->Ilo, &status);
-    fits_write_col(fptr, TINT32BIT, 11, nrows+1 , 1, 1, &fits_header->Qlo, &status);
-    fits_write_col(fptr, TINT32BIT, 12, nrows+1 , 1, 1, &fits_header->Ierr, &status);
-    fits_write_col(fptr, TINT32BIT, 13, nrows+1 , 1, 1, &fits_header->Qerr, &status);
+    fits_write_col(fptr, TINT32BIT,  9, nrows+1, 1, 1, &fits_header->Ihi,      &status);
+    fits_write_col(fptr, TINT32BIT, 10, nrows+1, 1, 1, &fits_header->Qhi,      &status);
+    fits_write_col(fptr, TINT32BIT, 11, nrows+1, 1, 1, &fits_header->Ilo,      &status);
+    fits_write_col(fptr, TINT32BIT, 12, nrows+1, 1, 1, &fits_header->Qlo,      &status);
+    fits_write_col(fptr, TINT32BIT, 13, nrows+1, 1, 1, &fits_header->Ierr,     &status);
+    fits_write_col(fptr, TINT32BIT, 14, nrows+1, 1, 1, &fits_header->Qerr,     &status);
 
-    fits_write_col(fptr, TFLOAT,    14, nrows+1,  1, 1, &fits_header->VIhi, &status);
-    fits_write_col(fptr, TFLOAT,    15, nrows+1,  1, 1, &fits_header->VQhi, &status);
-    fits_write_col(fptr, TFLOAT,    16, nrows+1,  1, 1, &fits_header->VIlo, &status);
-    fits_write_col(fptr, TFLOAT,    17, nrows+1,  1, 1, &fits_header->VQlo, &status);
+    fits_write_col(fptr, TFLOAT,    15, nrows+1, 1, 1, &fits_header->VIhi,     &status);
+    fits_write_col(fptr, TFLOAT,    16, nrows+1, 1, 1, &fits_header->VQhi,     &status);
+    fits_write_col(fptr, TFLOAT,    17, nrows+1, 1, 1, &fits_header->VIlo,     &status);
+    fits_write_col(fptr, TFLOAT,    18, nrows+1, 1, 1, &fits_header->VQlo,     &status);
 									       
-    fits_write_col(fptr, TINT32BIT, 18, nrows+1,  1, 1, &fits_header->subScan, &status);
-    fits_write_col(fptr, TFLOAT,    19, nrows+1,  1, 1, &fits_header->THOT, &status);
-    fits_write_col(fptr, TFLOAT,    20, nrows+1,  1, 1, &fits_header->RA, &status);
-    fits_write_col(fptr, TFLOAT,    21, nrows+1,  1, 1, &fits_header->DEC, &status);
+    fits_write_col(fptr, TINT32BIT, 19, nrows+1, 1, 1, &fits_header->scanID,   &status);
+    fits_write_col(fptr, TINT32BIT, 20, nrows+1, 1, 1, &fits_header->subScan,  &status);
+    fits_write_col(fptr, TSTRING,   21, nrows+1, 1, 1, &fits_header->type,     &status);
+    fits_write_col(fptr, TFLOAT,    22, nrows+1, 1, 1, &fits_header->THOT,     &status);
+    fits_write_col(fptr, TFLOAT,    23, nrows+1, 1, 1, &fits_header->RA,       &status);
+    fits_write_col(fptr, TFLOAT,    24, nrows+1, 1, 1, &fits_header->DEC,      &status);
 
-    fits_write_col(fptr, TSTRING,   22, nrows+1,  1, 1, &fits_header->filename, &status);
+    fits_write_col(fptr, TSTRING,   25, nrows+1, 1, 1, &fits_header->filename, &status);
 
-    if(fits_header->unit==6){ //ACS5 B1
-        array_length=512;
-    }
-    if(fits_header->unit==4){ //ACS3 B2
-        array_length=1024;
-    }
+    // these change based on which mixer
+    int mixer = fits_header->dev;
+    fits_write_col(fptr, TFLOAT,    26, nrows+1, 1, 1, &fits_header->psat[mixer-1], &status);
+    fits_write_col(fptr, TFLOAT,    27, nrows+1, 1, 1, &fits_header->imon[mixer-1], &status);
+    fits_write_col(fptr, TFLOAT,    28, nrows+1, 1, 1, &fits_header->gmon[mixer-1], &status);
+
 									     
+    /*
     // Write the spectra as a single 2*N column
-    if (fits_write_col(fptr, TDOUBLE, 23, nrows+1 , 1, 1 * array_length, array, &status)) {
+    if (fits_write_col(fptr, TDOUBLE, 29, nrows+1, 1, 1 * array_length, array, &status)) {
         fits_report_error(stderr, status);  // Print any error message
         return;
     }
+    */
 
     // Close the FITS file
     if (fits_close_file(fptr, &status)) {
@@ -357,32 +399,48 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
     }
 
     if (DEBUG)
-       printf("Array appended as a new row in the FITS table successfully.\n");
+        printf("Array appended as a new row in the FITS table successfully.\n");
 }
 
-void printDateTimeFromEpoch(time_t ts){
+void printDateTimeFromEpoch(time_t ts)
+{
+   struct tm *tm = gmtime(&ts);
 
-        struct tm *tm = gmtime(&ts);
-
-        char buffer[26];
-        strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", tm);
-        printf("UTC Date and Time: %s\n", buffer);
+   char buffer[26];
+   strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", tm);
+   printf("UTC Date and Time: %s\n", buffer);
 }
 
 
-int numPlaces (int n) {
-    if (n < 0) return numPlaces ((n == INT_MIN) ? INT_MAX: -n);
-    if (n < 10) return 1;
-    return 1 + numPlaces (n / 10);
+long get_seconds(const char *timestamp)
+{
+   struct tm t;
+   char *pos;
+
+   memset(&t, 0, sizeof(struct tm));
+
+   strptime(timestamp, "%Y-%m-%dT%H:%M:%S", &t);
+
+   time_t seconds = mktime(&t);
+
+   return (long) seconds;
+}
+
+
+int numPlaces (int n)
+{
+   if (n < 0)  return numPlaces ((n == INT_MIN) ? INT_MAX: -n);
+   if (n < 10) return 1;
+   return 1 + numPlaces (n / 10);
 }
 
 
 char nthdigit(int x, int n)
 {
-    while (n--) {
-        x /= 10;
-    }
-    return (x % 10) + '0';
+   while (n--) {
+      x /= 10;
+   }
+   return (x % 10) + '0';
 }
 
 
@@ -410,8 +468,16 @@ void const callback(struct inotify_event *event, const char *directory){
 
 #ifdef NO_FS
 void const callback(char *filein){
-   char *name = malloc(48*sizeof(char));
-   strcpy(name, filein);
+   char *fullpath= malloc(48*sizeof(char));
+   strcpy(fullpath, filein); // make a copy leaving filein intact for later tokenization
+
+   char *datafile;	// datafile is filename with no path - used in fits header
+   datafile = strrchr(fullpath, '/');
+   if (datafile != NULL) {
+	   datafile++;
+   } else {
+	   datafile = name;
+   }
 #endif
 
    //char errfile[64] = "err.log";
@@ -457,56 +523,70 @@ void const callback(char *filein){
    float *Rn;
    float *Rn2;
 
-   //telemetry objects
+   // per row telemetry objects
    float RA=0.;
    float DEC=0.;
    float THOT=0.;
-   int IF=0.;
-   float VLSR=0.;
-   float LO=0.;
-   char *TARGET = (char *)malloc(16);
+   float LO_PSat[4];
+   float HEBImon[4];
+   float LO_Gmon[4];
+   long THOT_time;	// time at which HK_TEMP11 was taken (seconds since epoch)
 
    // notification
    printf("File changed: %s\n", filein);
    fp = fopen(filein, "r");
 
+   // tokenize scanID from filename
+   char *token;
+   int position = 0;
+   int band    = -1;
+   char *prefix=malloc(4*sizeof(char));;
+   int scanID  = -1;
+   int subScan = -1;
+
+   int CALID   = -1;	// scanID of previous correlator calibration
+   int THOTID  = -1;	// scanID of most recent HK_TEMP11 relative to correlator timestamp
+   bool error  = FALSE;	// status of error which may end processing early
+
    // Find file type from filename
    int i=0;
    char *ptr = NULL;
-   char *prefix=malloc(4*sizeof(char));;
    const char *prefix_names[]={"SRC", "REF", "OTF", "HOT", "COLD", "FOC", "UNK"};
-   while ( ptr==NULL ){
-      ptr = strstr(filein, prefix_names[i]);
-      i++;
-   }
-   int len = strlen(prefix_names[i-1]);
-   strncpy(prefix, ptr, len);
-   prefix[len] = '\0';
-   printf("The type is %s\n", prefix);
 
-   // Find scanID from filename
-   char *token;
-   int position = 0;
-   int scanID  = -1;
-   int CALID   = -1;
-   int THOTID  = -1;
-   int TUNEID  = -1;
-   int subScan = -1;
-   bool error  = FALSE;
-
-    // Use strtok to tokenize the filename using underscores as delimiters
-    token = strtok(filein, "_");
+   // Use strtok to tokenize the filename using underscores as delimiters
+   // First use "/" to redact any relative path
+   token = strtok(filein, "/");
+   token = strtok(NULL, "/");
 
    // Iterate through the tokens until reaching the 2nd position
    while (token != NULL ) {
       token = strtok(NULL, "_");
 
-      if (position == 1 ) {      //get scanID
-         if(atoi(token)>0) scanID = atoi(token);
+      if (position == 0 ) {      //get band
+	 if (strstr(token, "ACS3"))
+            band = 2;
+	 if (strstr(token, "ACS5"))
+            band = 1;
+         printf("Band is: %d\n", band);
+      }
+
+      if (position == 1 ) {      //get scan type
+         while ( ptr==NULL ){
+            ptr = strstr(token, prefix_names[i]);
+            i++;
+         }
+         int len = strlen(prefix_names[i-1]);
+         strncpy(prefix, ptr, len);
+         prefix[len] = '\0';
+         printf("The type is %s\n", prefix);
+      }
+
+      if (position == 2 ) {      //get scanID
+         if (atoi(token)>0) scanID = atoi(token);
          printf("The scanID is: %d\n", scanID);
       }
 
-      if (position == 2 ) {      //get subscanID
+      if (position == 3 ) {      //get subscanID
          subScan = atoi(token);
          printf("The data file index # is: %05d\n", subScan);
       }
@@ -539,9 +619,10 @@ void const callback(char *filein){
       printf("%s\n", HOTregex);
 
 
+   // integer variables for fread from datafile
    int32_t value;
-   uint32_t value1;
-   uint32_t value2;
+   uint32_t value1;	// for first 32 bits of UNIXTIMRE
+   uint32_t value2;	//
 
    // figure out how many spectra in the file
    fseek(fp, 24, SEEK_SET);     // go to header position
@@ -556,11 +637,75 @@ void const callback(char *filein){
    const char *header_names[]={"UNIT", "DEV", "NINT", "UNIXTIME", "FRAC", "NBYTES", "CORRTIME", \
 			       "EMPTY", "Ihigh", "Qhigh", "Ilow", "Qlow", "Ierr", "Qerr"};
 
+   ///////////// SLOW CADENCE HOUSEKEEPING - GOES INTO primary fits_header ////////////////
+   // Most recent HOT temperature from current scanID or ahead/behind 2 scanIDs
+   curl = init_influx();
+   sprintf(query, "&q=SELECT * FROM \"HK_TEMP11\"   WHERE \"scanID\"=~/^%s/ ORDER BY time DESC LIMIT 3", HOTregex);
+   influxReturn = influxWorker(curl, query);
+   THOT = influxReturn->value[0] + 273.13; //Kelvin -> Celsius
+   THOTID = influxReturn->scanID;
+
+   printf("time of THOTID is %s\t", influxReturn->time);
+   THOT_time = get_seconds(influxReturn->time);
+   printf("%ld\n", THOT_time);
+
+   freeinfluxStruct(influxReturn);
+
+   /////////// SLOW CADENCE HOUSEKEEPING - GOES INTO primary fits_header once //////////////
+   
+
+   ///////////// FAST CADENCE HOUSEKEEPING - GOES INTO per row fits_header  ////////////////
+   ///////////// but doesn't change every row, at most once every HOT       ////////////////
+
+   // LO Drive currents
+   curl = init_influx();
+   if (band==1){ //ACS5 B1
+      sprintf(query, "&q=SELECT * FROM /^PSatI_B1M2|PSatI_B1M3|PSatI_B1M4|PSatI_B1M6/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
+   }
+   if (band==2){ //ACS3 B2
+      sprintf(query, "&q=SELECT * FROM /^PSatI_B2M2|PSatI_B2M3|PSatI_B2M5|PSatI_B2M8/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
+   }
+   influxReturn = influxWorker(curl, query);
+   for (int i=0; i<influxReturn->length; i++){
+      LO_PSat[i] = influxReturn->value[i]; // LO Drive Currents (Amps)
+   }
+   freeinfluxStruct(influxReturn);
+   
+   // HEB Mixer Currents
+   curl = init_influx();
+   if (band==1){ //ACS5 B1
+      sprintf(query, "&q=SELECT * FROM /^biasCurB1M2|biasCurB1M3|biasCurB1M4|biasCurB1M6/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
+   }
+   if (band==2){ //ACS3 B2
+      sprintf(query, "&q=SELECT * FROM /^biasCurB2M2|biasCurB2M3|biasCurB2M5|biasCurB1M8/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
+   }
+   influxReturn = influxWorker(curl, query);
+   for (int i=0; i<influxReturn->length; i++){
+      HEBImon[i] = influxReturn->value[i]; // Mixer Currents (mA)
+   }
+   freeinfluxStruct(influxReturn);
+
+   // LO Gate Monitor
+   curl = init_influx();
+   if (band==1){ //ACS5 B1
+      sprintf(query, "&q=SELECT * FROM /^B1_GMONI_2|B1_GMONI_3|B1_GMONI_4|B1_GMONI_6/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
+   }
+   if (band==2){ //ACS3 B2
+      sprintf(query, "&q=SELECT * FROM /^B2_GMONI_2|B2_GMONI_3|B2_GMONI_5|B2_GMONI_8/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
+   }
+   influxReturn = influxWorker(curl, query);
+   for (int i=0; i<influxReturn->length; i++){
+      LO_Gmon[i] = influxReturn->value[i]; // Mixer Currents (mA)
+   }
+   freeinfluxStruct(influxReturn);
+   ///////////// FAST CADENCE HOUSEKEEPING - GOES INTO per row fits_header ////////////////
+
+
 //////////////////////////////  LOOP OVER ALL SPECTRA IN FILE  ///////////////////////////////////
 
 
    // Start at beginning of data file
-   for(int j=0; j<(int)sz/bps; j++)
+   for (int j=0; j<(int)sz/bps; j++)
    {
 
    // Declare all Python objects for refpower
@@ -574,7 +719,7 @@ void const callback(char *filein){
    PyObject *pValueII, *pValueQI, *pValueIQ, *pValueQQ; 
 
    // Arguments to relpower(XmonL, XmonH)
-   if(DOQC){
+   if (DOQC){
       pArgs   = PyTuple_New(2); // for relpower(XmonL, XmonH)
       pArgsII = PyTuple_New(5); // for qc(ImonL, ImonH, ImonL, ImonH, corr.II)
       pArgsIQ = PyTuple_New(5); // for qc(ImonL, ImonH, QmonL, QmonH, corr.IQ)
@@ -586,8 +731,8 @@ void const callback(char *filein){
    if (DEBUG)
       printf("The type is %s\n", prefix);
       // Loop over header location
-      for(int i=0; i<22; i++){
-         if(i==3){
+      for (int i=0; i<22; i++){
+         if (i==3){
             //UNIXTIME is 64 bits
             fread(&value1, 4, 1, fp); //Least significant 32 bits
             fread(&value2, 4, 1, fp); //Most significant 32 bis
@@ -618,10 +763,10 @@ void const callback(char *filein){
       corr.Qerr     = header[13];
 
       // Since we know UNIT and NLAGS, set correlator frequency and fits spectrum for later use
-      if(UNIT==6){ //ACS5 B1
+      if (band==1){ //ACS5 B1
          FS_FREQ = 5000.;
       }
-      if(UNIT==4){ //ACS3 B2
+      if (band=2){ //ACS3 B2
          FS_FREQ = 5000.;
       }
 
@@ -641,53 +786,27 @@ void const callback(char *filein){
          break;
       }
 
-      // Last VLSR tuning from InfluxDB anytime before current obs time 
-      curl = init_influx();
-      sprintf(query, "&q=SELECT last(VLSR),* FROM \"tuning\" WHERE time<=\%" PRIu64 "000000000", UNIXTIME);
-      influxReturn = influxWorker(curl, query);
-      if(UNIT==6){ //ACS5 B1
-         IF   = influxReturn->value[1];
-         LO   = influxReturn->value[3];
-      }
-      if(UNIT==4){ //ACS3 B2
-         IF   = influxReturn->value[2];
-         LO   = influxReturn->value[4];
-      }
-      TARGET = influxReturn->text;
-      VLSR   = influxReturn->value[0];
-      TUNEID = influxReturn->scanID;
-
+    
+      /////////// Get data for the HIGH SPEED Housekeeping for per row fits header ///////////
+      ///////////   This data *does* change every spectra   ///////////
 
       // RA, DEC from InfluxDB 0.5s ahead or behind time
-      // hesperia DB = 28800
-      // sculptor DB = 25200
       curl = init_influx();
-      sprintf(query, "&q=SELECT * FROM \"udpPointing\" WHERE \"scanID\"=~/%d/ AND time>\%" PRIu64 "500000000 AND time<\%" PRIu64 "500000000", scanID, UNIXTIME-1-25200, UNIXTIME+0-25200);
+      sprintf(query, "&q=SELECT * FROM \"udpPointing\" WHERE \"scanID\"=~/^%d/ AND time>\%" PRIu64 "500000000 AND time<\%" PRIu64 "500000000", scanID, UNIXTIME-1, UNIXTIME+1);
       influxReturn = influxWorker(curl, query);
-      DEC = influxReturn->value[0];
-      RA  = influxReturn->value[1];
+      RA  = influxReturn->value[6];
+      DEC = influxReturn->value[2];
 
       // Free the allocated memory from udpPointing
       freeinfluxStruct(influxReturn);
 
-     
-      // Most recent HOT temperature from current scanID or ahead/behind 2 scanIDs
-      curl = init_influx();
-      sprintf(query, "&q=SELECT * FROM \"HK_TEMP11\"   WHERE \"scanID\"=~/%s/ ORDER BY time DESC LIMIT 3", HOTregex);
-      influxReturn = influxWorker(curl, query);
-      THOT = influxReturn->value[0] + 273.13; //Kelvin -> Celsius
-      THOTID = influxReturn->scanID;
-
       if (DEBUG)
-         printf("======== RA=%.3f DEC=%.3f THOT=%.1f==========\n", RA, DEC, THOT);  //Info print
-
-      // Free the allocated memory from HK_TEMP11
-      freeinfluxStruct(influxReturn);
-
+         printf("======== RA=%.3f DEC=%.3f ==========\n", RA, DEC);  //Info print
+										    //
 
       // Single SELECT for CORRELATOR DACS from current or nearest previous Correlator Cal
       curl = init_influx();
-      sprintf(query, "&q=SELECT * FROM /^ACS%d_DEV%d_*/ WHERE \"scanID\"=~/%s/ ORDER BY time DESC LIMIT 10", UNIT-1, DEV, scanIDregex);
+      sprintf(query, "&q=SELECT * FROM /^ACS%d_DEV%d_*/ WHERE \"scanID\"=~/^%s/ ORDER BY time DESC LIMIT 10", UNIT-1, DEV, scanIDregex);
       influxReturn = influxWorker(curl, query);
       dacV[0] = influxReturn->value[3]; //VIhi  Order is reverse alphabetical from InfluxDB SELECT
       dacV[1] = influxReturn->value[1]; //VQhi
@@ -712,7 +831,7 @@ void const callback(char *filein){
          VQlo = dacV[2];
       }
       
-      if(VIhi==0.){ //Still no values?  bail and don't make spectra
+      if (VIhi==0.){ //Still no values?  bail and don't make spectra
          printf("######################## ERROR ###########################\n");
          printf("#                                                        #\n");
          printf("#                  Error, no DAC values!                 #\n");
@@ -725,7 +844,6 @@ void const callback(char *filein){
       // DEBUG
       if (DEBUG)
          printf("VIhi %.3f\tVQhi %.3f\tVIlo %.3f\tVQlo %.3f\n", VIhi, VQhi, VIlo, VQlo);
-
 
       // Build the spectra filename and put it in the spectra directory
       //char fileout[512];
@@ -744,7 +862,6 @@ void const callback(char *filein){
          N = 128;
       int specA = (int) N/128 - 1;
 
-
       //We don't know the lag # until we open the file, so malloc now
       corr.II   = malloc(N*sizeof(int32_t));   //Uncorrected ints
       corr.QI   = malloc(N*sizeof(int32_t));
@@ -760,7 +877,7 @@ void const callback(char *filein){
       Rn2 = malloc(4*N*sizeof(float));
 
       // Read lags in from file in order after header
-      for(int i=0; i<N; i++){
+      for (int i=0; i<N; i++){
          fread(&value, 4, 1, fp);
          corr.II[i] = value;
          fread(&value, 4, 1, fp);
@@ -776,7 +893,7 @@ void const callback(char *filein){
       // PASS THE UNCORRECTED LAGS INTO PYTHON FOR QUANTIZATION CORRECTION HERE !!!
        
 
-      if(DOQC){
+      if (DOQC){
       // create a Python list and fill it with normalized uncorrected correlation coefficients
       // Check for errors
       if (pModule != NULL) {
@@ -879,7 +996,7 @@ void const callback(char *filein){
       // If we're not going to do the QC DLL, then just copy lags over and normlize them at least
    else
    {
-      for(int i=0; i<N; i++){
+      for (int i=0; i<N; i++){
          corr.IIqc[i] = corr.II[i]/corr.II[0];
          corr.IQqc[i] = corr.IQ[i]/corr.IQ[0];
          corr.QIqc[i] = corr.QI[i]/corr.QI[0];
@@ -892,16 +1009,16 @@ void const callback(char *filein){
 
 
       // Combine IQ lags into R[]
-         for(int i=0; i<(2*N)-1; i++){
-            if(i%2 == 0) Rn[i] = 0.5* (corr.IIqc[i/2] + corr.QQqc[i/2]);           // Even indicies
-            if(i%2 == 1) Rn[i] = 0.5* (corr.IQqc[(i-1)/2] + corr.QIqc[(i-1)/2+1]); // Odd  indicies
+         for (int i=0; i<(2*N)-1; i++){
+            if (i%2 == 0) Rn[i] = 0.5* (corr.IIqc[i/2] + corr.QQqc[i/2]);           // Even indicies
+            if (i%2 == 1) Rn[i] = 0.5* (corr.IQqc[(i-1)/2] + corr.QIqc[(i-1)/2+1]); // Odd  indicies
          }
          int le = 2*N-1; //last element
          Rn[le] = 0.5* (corr.IQqc[(le-1)/2] + corr.QIqc[(le-1)/2]);         // Last element
 
       // Mirror R[] symmetrically
-         for(int i=0; i<4*N-1; i++){
-           if( i<2*N ) Rn2[2*N-1-i] = Rn[i];
+         for (int i=0; i<4*N-1; i++){
+           if ( i<2*N ) Rn2[2*N-1-i] = Rn[i];
            else        Rn2[i]       = Rn[i-(2*N-1)];
          }
 
@@ -913,7 +1030,7 @@ void const callback(char *filein){
       // circular shift minus one step
        circularShiftLeft(corr.IQqc, sizeof(corr.IQqc) / sizeof(corr.IQqc[0]));
 
-        for(int i=0; i<2*N; i+=2){
+        for (int i=0; i<2*N; i+=2){
            Rn[i]   = 0.5 * (corr.IIqc[i/2] + corr.QQqc[i/2]);
            Rn[i+1] = 0.5 * (corr.IQqc[i/2] + corr.QIqc[i/2]);
         }
@@ -921,12 +1038,12 @@ void const callback(char *filein){
 */
 
       // Apply Hann window
-         for(int i=0; i<4*N; i++){
+         for (int i=0; i<4*N; i++){
            Rn2[i] = Rn2[i]*0.5*(1-cos(2*PI*i/(4*N)));     //real with Hann window
          }
 
       // Fill fft struct
-         for(int i=0; i<4*N; i++){
+         for (int i=0; i<4*N; i++){
            spec[specA].in[i][0] = Rn2[i];  //real
            spec[specA].in[i][1] = 0.;      //imag
          }
@@ -946,7 +1063,7 @@ void const callback(char *filein){
       // over a range of power levels (HOT, OTF, REF) the two give equal results
       // (The factor 1.8197 likely comes from the erfinv for a 3-level ACS)
       
-      if(DOQC){ // Only do this if Python Objects are declared
+      if (DOQC){ // Only do this if Python Objects are declared
          PyTuple_SetItem(pArgs, 0, PyFloat_FromDouble((double)corr.Ilo/corr.corrtime));
          PyTuple_SetItem(pArgs, 1, PyFloat_FromDouble((double)corr.Ihi/corr.corrtime));
          pValue = PyObject_CallObject(pFunc1, pArgs);
@@ -997,7 +1114,7 @@ void const callback(char *filein){
       // Write to error log.
       // Was for flight ops.  Probably will deprecate soon.
       /*
-      if(1)
+      if (1)
       {
          errf = fopen(errfile, "a");
          fprintf(errf, "%s\t", name);
@@ -1019,7 +1136,7 @@ void const callback(char *filein){
    
       //Print in counts per second (assuming FS_FREQ sampling freq)
       /*
-      for(int i=0; i<2*N; i++){
+      for (int i=0; i<2*N; i++){
          fprintf(fout, "%d\t%lf\n", (FS_FREQ*i)/(2*N), sqrt(P_I*P_Q) * \
                                     sqrt(pow(spec[specA].out[i][0],2)+pow(spec[specA].out[i][1],2)));
       }
@@ -1033,7 +1150,7 @@ void const callback(char *filein){
       if (DEBUG>1){
          fout = fopen("lags.txt", "w");
          //Save QC lags
-         for(int i=0; i<N; i++){
+         for (int i=0; i<N; i++){
             fprintf(fout, "%d\t%f\t%f\t%f\t%f\n", i, corr.IIqc[i], corr.QQqc[i], corr.IQqc[i], corr.QIqc[i]);
          }
          fclose(fout);
@@ -1041,7 +1158,7 @@ void const callback(char *filein){
 
          fout = fopen("lagsRn.txt", "w");
          //Save combined lags
-         for(int i=0; i<2*N; i++){
+         for (int i=0; i<2*N; i++){
             fprintf(fout, "%d\t%f\n", i,Rn[i]);
          }
          fclose(fout);
@@ -1049,20 +1166,21 @@ void const callback(char *filein){
 
          fout = fopen("lagsRn2.txt", "w");
          //Save combined mirrored lags
-         for(int i=0; i<4*N; i++){
+         for (int i=0; i<4*N; i++){
             fprintf(fout, "%d\t%f\n", i,Rn2[i]);
          }
          fclose(fout);
       }
  */
 
-
       // Construct the per row FITS HEADER
-
       s_header *fits_header = (s_header *)malloc(sizeof(s_header));
       fits_header->type     = (char *)malloc(6);
       fits_header->filename = (char *)malloc(48);
-      fits_header->target   = (char *)malloc(16);
+
+      fits_header->psat  = (float *)malloc(4);
+      fits_header->imon  = (float *)malloc(4);
+      fits_header->gmon  = (float *)malloc(4);
 
       fits_header->unit     = UNIT;
       fits_header->dev      = DEV;
@@ -1070,7 +1188,8 @@ void const callback(char *filein){
       fits_header->unixtime = (int) UNIXTIME;
       fits_header->frac     = FRAC;
       fits_header->nbytes   = NBYTES;
-      fits_header->corrtime = (corr.corrtime*256.)/(FS_FREQ*1000000.);
+      fits_header->corrtime = corr.corrtime;
+      fits_header->inttime  =(corr.corrtime*256.)/(FS_FREQ*1000000.);
 
       fits_header->Ihi      = corr.Ihi;
       fits_header->Qhi      = corr.Qhi;
@@ -1090,23 +1209,30 @@ void const callback(char *filein){
       fits_header->THOT     = THOT;
       fits_header->RA       = RA;
       fits_header->DEC      = DEC;
-      fits_header->IF       = IF;
-      fits_header->LO       = LO;  
-      fits_header->VLSR     = VLSR;
+
+      for (int i=0; i<4; i++){
+         fits_header->psat[i]  = LO_PSat[i];
+         fits_header->imon[i]  = HEBImon[i];
+         fits_header->gmon[i]  = LO_Gmon[i];
+      }
 
       strcpy(fits_header->type, prefix);
-      strcpy(fits_header->filename, name);
-      strcpy(fits_header->target, TARGET);
+      strcpy(fits_header->filename, datafile);
       
       // Construct the FITS DATA
       double *array = malloc(2*N*sizeof(double));
-      for(int i=0; i<2*N; i++){
+      for (int i=0; i<2*N; i++){
          array[i] = (FS_FREQ*1e6)/(corr.corrtime*256.) * sqrt(P_I*P_Q) * sqrt(pow(spec[specA].out[i][0],2)+pow(spec[specA].out[i][1],2));
       }
 
       // Let's try out CFITSIO!
+      // edit: 8/9/24 instead of 3 files (hot,otf,ref) for each scanID, combine to one.
+      // 
       char fitsfile[20];
-      sprintf(fitsfile, "ACS%d_%s_%05d.fits", UNIT-1, prefix, scanID);
+      if ( strstr(prefix, "REF") )
+         sprintf(fitsfile, "ACS%d_%05d.fits", UNIT-1, scanID-1); // if REF, then put in previous OTF/HOT scanID fits file
+      else
+         sprintf(fitsfile, "ACS%d_%05d.fits", UNIT-1, scanID);
       if (DEBUG)
          printf("%s\n", fitsfile);
       append_to_fits_table(fitsfile, fits_header, array, THOTID);
@@ -1128,66 +1254,58 @@ void const callback(char *filein){
 
       free(fits_header->type);
       free(fits_header->filename);
-      free(fits_header->target);
+      free(fits_header->psat);
+      free(fits_header->imon);
+      free(fits_header->gmon);
       free(fits_header);
 
-//
-// move to within 100 spectra loop
-//
-
-   // Clean Up memory before leaving callback()
-   // All of these objects are malloced at the start of callback but re-used every spectra
-   // 4 X pArgs 
-   //printf("free pArgsII\t from refcount\t %ld\n", pArgsII->ob_refcnt);
-   Py_DECREF(pArgsII);
-   //printf("free pArgsIQ\t from refcount\t %ld\n", pArgsIQ->ob_refcnt);
-   Py_DECREF(pArgsIQ);
-   //printf("free pArgsQI\t from refcount\t %ld\n", pArgsQI->ob_refcnt);
-   Py_DECREF(pArgsQI);
-   //printf("free pArgsQQ\t from refcount\t %ld\n", pArgsQQ->ob_refcnt);
-   Py_DECREF(pArgsQQ);
+      // Clean Up memory before moving to next spectra
+      // All of these objects are malloced at the start of every spectra and freed every time
+      // 4 X pArgs 
+      //printf("free pArgsII\t from refcount\t %ld\n", pArgsII->ob_refcnt);
+      Py_DECREF(pArgsII);
+      //printf("free pArgsIQ\t from refcount\t %ld\n", pArgsIQ->ob_refcnt);
+      Py_DECREF(pArgsIQ);
+      //printf("free pArgsQI\t from refcount\t %ld\n", pArgsQI->ob_refcnt);
+      Py_DECREF(pArgsQI);
+      //printf("free pArgsQQ\t from refcount\t %ld\n", pArgsQQ->ob_refcnt);
+      Py_DECREF(pArgsQQ);
     
-   // and the refpower
-   //printf("free pArgs\t from refcount\t %ld\n", pArgs->ob_refcnt);
-   Py_DECREF(pArgs);
+      // and the refpower
+      //printf("free pArgs\t from refcount\t %ld\n", pArgs->ob_refcnt);
+      Py_DECREF(pArgs);
 
-   // 4 X pValue
-   //printf("free pValueII\t from refcount\t %ld\n", pValueII->ob_refcnt);
-   Py_DECREF(pValueII);
-   //printf("free pValueIQ\t from refcount\t %ld\n", pValueIQ->ob_refcnt);
-   Py_DECREF(pValueIQ);
-   //printf("free pValueQI\t from refcount\t %ld\n", pValueQI->ob_refcnt);
-   Py_DECREF(pValueQI);
-   //printf("free pValueQQ\t from refcount\t %ld\n", pValueQQ->ob_refcnt);
-   Py_DECREF(pValueQQ);
+      // 4 X pValue
+      //printf("free pValueII\t from refcount\t %ld\n", pValueII->ob_refcnt);
+      Py_DECREF(pValueII);
+      //printf("free pValueIQ\t from refcount\t %ld\n", pValueIQ->ob_refcnt);
+      Py_DECREF(pValueIQ);
+      //printf("free pValueQI\t from refcount\t %ld\n", pValueQI->ob_refcnt);
+      Py_DECREF(pValueQI);
+      //printf("free pValueQQ\t from refcount\t %ld\n", pValueQQ->ob_refcnt);
+      Py_DECREF(pValueQQ);
 	       
-   // and the refpower
-   //printf("free pValue\t from refcount\t %ld\n", pValue->ob_refcnt);
-   Py_DECREF(pValue);
+      // and the refpower
+      //printf("free pValue\t from refcount\t %ld\n", pValue->ob_refcnt);
+      Py_DECREF(pValue);
    
-
-   // 4 X pList
-   // These don't need to be freed since PyList_SetItem() steals the reference
-   /*
-   printf("free pListII\t from refcount\t %ld\n", pListII->ob_refcnt);
-   Py_DECREF(pListII);
-   printf("free pListIQ\t from refcount\t %ld\n", pListIQ->ob_refcnt);
-   Py_DECREF(pListIQ);
-   printf("free pListQI\t from refcount\t %ld\n", pListQI->ob_refcnt);
-   Py_DECREF(pListQI);
-   printf("free pListQQ\t from refcount\t %ld\n", pListQQ->ob_refcnt);
-   Py_DECREF(pListQQ);
-   */
+      // 4 X pList
+      // These don't need to be freed since PyList_SetItem() steals the reference
+      /*
+      printf("free pListII\t from refcount\t %ld\n", pListII->ob_refcnt);
+      Py_DECREF(pListII);
+      printf("free pListIQ\t from refcount\t %ld\n", pListIQ->ob_refcnt);
+      Py_DECREF(pListIQ);
+      printf("free pListQI\t from refcount\t %ld\n", pListQI->ob_refcnt);
+      Py_DECREF(pListQI);
+      printf("free pListQQ\t from refcount\t %ld\n", pListQQ->ob_refcnt);
+      Py_DECREF(pListQQ);
+      */
      
-   if (DEBUG)
-      printf("all Python Objects from callback() freed\n\n");
+      if (DEBUG)
+         printf("all Python Objects from callback() freed\n\n");
  
- //
- // end test free in loop
- //
-
-   }
-
+   } // END SPECTRA LOOP
 /////////////////////////////  END LOOP OVER ALL SPECTRA IN FILE  ///////////////////////////////////
    
    fclose(fp);   //close input data file
@@ -1212,10 +1330,6 @@ void const callback(char *filein){
       printf("The cal    is from scanID: %d\n", CALID);
       printf("The THOT   is from scanID: %d\n", THOTID);
       printf("The data   is from scanID: %d\n", scanID);
-      printf("The tuning is from scanID: %d\n", TUNEID);
-      printf("\tIF   = %d MHz\n", IF);
-      printf("\tVLSR = %.0f km/s\n", VLSR);
-      printf("\tTRGET= %s\n", TARGET);
    }
 
    //timing

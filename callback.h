@@ -33,7 +33,8 @@ typedef struct s_header {
 	int		unixtime;
 	float           frac;
 	int		nbytes;
-	float		corrtime;
+	int  		corrtime;
+	float		inttime;
 	int		Ihi;
 	int		Qhi;
 	int		Ilo;
@@ -50,12 +51,14 @@ typedef struct s_header {
 	float		THOT;
 	float		RA;
 	float		DEC;
-	int  		IF;
 	float		LO;
-	float		VLSR;
+	float		IF;
+	float 		VLSR;
 	char		*type;
 	char		*filename;
-	char		*target;
+	float           *psat;
+	float           *imon;
+	float           *gmon;
 } s_header;
 
 
