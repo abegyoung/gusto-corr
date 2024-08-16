@@ -10,13 +10,15 @@
 // struct for the influxDB worker to return
 typedef struct 
 {
-  size_t   length;
-  char     time[64];
-  int16_t  scanID;
-  float    *value;
-  char     text[64];
-  char     **name;
-  char     **cols;
+  char     time[64];	// time string
+  char     text[64];	// text string for TARGETNAMES
+			
+  int16_t  scanID;	// scanID
+  float    *value;	// values of measurements
+  char     **name;	// names of measurements
+			
+  char     **cols;	// how many columns of values are returned from influx
+  size_t   length;	// how many time are a measurement returned from influx
 } influxStruct;
 extern influxStruct *influxReturn;
 

@@ -110,8 +110,8 @@ size_t write_callback(char *contents, size_t size, size_t nmemb, void *userp) {
 
     int pos = 0;	//token count
     char *token;
-    char ID[32]="";
-    char data[32]="";
+    char ID[64]="";
+    char data[64]="";
 
     // vars to extract number of columns substring
     char *start_str = "\"columns\":\[";
@@ -187,8 +187,11 @@ size_t write_callback(char *contents, size_t size, size_t nmemb, void *userp) {
         while (token != NULL ){
 
 	        if(pos == time_indx){
+	                memset(ID, '\0', sizeof(ID));
+		        strncpy(ID, token+1, strlen(token)-2);
+			strcpy(influxReturn->time, ID);
                         //DEBUG
-                        //printf("time is %s\n", token);
+                        //printf("time string = %s\n", ID);
 	        }
     
 	        else if(pos == scan_indx){
@@ -208,6 +211,7 @@ size_t write_callback(char *contents, size_t size, size_t nmemb, void *userp) {
 	        }
 
 	        else{
+	                memset(data, '\0', sizeof(data));
 		        strncpy(data, token, strlen(token));
 		        influxReturn->value[data_indx] = atof(data);
                         //DEBUG
