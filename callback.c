@@ -476,7 +476,7 @@ void const callback(char *filein){
    if (datafile != NULL) {
 	   datafile++;
    } else {
-	   datafile = name;
+	   datafile = fullpath;
    }
 #endif
 
@@ -1403,7 +1403,7 @@ void const callback(char *filein){
    free(query);
 
    // Free Influx query string
-   free(name);
+   free(fullpath);
    
 }
 
