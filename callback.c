@@ -41,7 +41,7 @@ void circularShiftLeft(float arr[], int size) {
 void get_git_commit_info(const char *filename, char *commit_info) {
     char command[BUFSIZ];
     FILE *fp;
-    char hash[BUFSIZ], date[BUFSIZ];
+    char hash[BUFSIZ];
 
     // Construct the command to get the commit hash
     snprintf(command, sizeof(command), "git log -1 --format=%%cd --date=format-local:'%%Y-%%m-%%d %%H:%%M:%%S %%Z' --pretty=format:\"Last commit %%h by %%an %%ad\" -- %s", filename);
@@ -56,6 +56,24 @@ void get_git_commit_info(const char *filename, char *commit_info) {
 
     // Combine hash and date into the commit_info string
     snprintf(commit_info, BUFSIZ+sizeof(filename), "%s %s", filename, hash);
+}
+
+void get_proctime(char *proctime) {
+   char command[BUFSIZ];
+   FILE *fp;
+   char date[BUFSIZ];
+   
+   snprintf(command, sizeof(command), "date +%%Y%%m%%d_%%H%%M%%S");
+   fp = popen(command, "r");
+   if (fp == NULL) {
+      perror("popen");
+      exit(EXIT_FAILURE);
+   }
+   fgets(date, sizeof(date), fp);
+   pclose(fp);
+   date[strcspn(date, "\n")] = 0; // Remove trailing newline
+
+   snprintf(proctime, BUFSIZ, "%s", date);
 }
 
 
@@ -74,6 +92,7 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
     char *buf;
 
     char commit_info[256];
+    char proctime[256];
 
     int IF_index, LO_index;
     float crpix = 0.;
@@ -144,31 +163,50 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
             fits_write_key(fptr, TINT,    "BAND",      &band,     "GUSTO band #",     &status);
             fits_write_key(fptr, TINT,    "NPIX",      &npix,     "N spec pixels",    &status);
             fits_write_key(fptr, TSTRING, "DLEVEL",    "0.7",      "data level",      &status);
-            fits_write_key(fptr, TSTRING, "Proctime",  "20240814_1652",  "processing time", &status);
+	    get_proctime(proctime);
+            fits_write_key(fptr, TSTRING, "Proctime",  proctime,  "processing time", &status);
 
+	    fits_write_comment(fptr, "  Housekeeping Temperatures", &status);
 	    // Ambient HK_TEMP           0          1          2          3          4          5          6          7          
             const char *hktemp_names[]={"CRADLE02","CRYCSEBK","CRYOPORT","CALMOTOR","CRADLE03","QAVCCTRL","COOLRTRN","FERADIAT", \
 		                        "CRYCSEFT","CRADLE04","CONELOAD","OAVCCTRL","COOLSUPL","CRADLE01","EQUILREF","SECONDRY"};
 	                              // 8          9          10         11         12         13         14         15
-            const char *hktemp_descs[]={""};
+            const char *hktemp_descs[]={"Cradle 2 temp (C)", \
+		                        "Cryostat Back temp (C)", \
+		                        "Cryostat pumpout port temp (C)", \
+		                        "Calibration flip mirror motor temp (C)", \
+		                        "Cradle 3 temp (C)", \
+		                        "QCL AVC Cryocooler CTRL temp (C)", \
+		                        "Cooling Loop Return temp (C)", \
+		                        "Front End Radiator temp (C)", \
+
+		                        "Cryostat Left Side temp (C)", \
+		                        "Cradle 4 temp (C)", \
+		                        "Calibration load temp (C)", \
+		                        "OVCS AVC Cryocooler CTRL temp (C)", \
+		                        "Cooling Loop Supply temp (C)", \
+		                        "Cradle 1 temp (C)", \
+		                        "Equilibar Reference temp (C)", \
+		                        "Secondary temp (C)"};
 	    curl = init_influx();
             sprintf(query, "&q=SELECT * FROM /^HK_TEMP*/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
             influxReturn = influxWorker(curl, query);
 	    for (int i=0; i<influxReturn->length; i++){
 	       if( strcmp(hktemp_names[i], "CONELOAD"))
-                   fits_write_key(fptr, TFLOAT, hktemp_names[i], &influxReturn->value[i], "Ambient temps (C)", &status);
+                   fits_write_key(fptr, TFLOAT, hktemp_names[i], &influxReturn->value[i], hktemp_descs[i], &status);
 	    }
             freeinfluxStruct(influxReturn);
 
 	    
+	    fits_write_comment(fptr, "   LO Chain Temperatures", &status);
 	    // LO AD590                  0          1          10         11         2          3          
-            const char *lotemp_names[]={"UNUSED  ","B1_MLSE ","B1POWER3","B1POWER4","UNUSED  ","UNUSED  ", \
-		                        "B1CH5SPK","UNUSED  ","UNUSED  ","UNUSED  ","B1POWER1","B1POWER2", \
-                                        "B2INTRN1","B2INTRN2","B2POWER3","B2POWER4","UNUNSED ","UNUSED  ", \
-		                        "UNUSED  ","B2AVA183","B1CH5MLT","B2CH5SPK","B2POWER1","B2POWER2"};
+            const char *lotemp_names[]={"UNUSED  ","B1_SYNTH","B1_PWR_3","B1_PWR_4","UNUSED  ","UNUSED  ", \
+		                        "B1M5_AMP","UNUSED  ","UNUSED  ","UNUSED  ","B1_PWR_1","B1_PWR_2", \
+                                        "B2_UCTRL","B2MLTDRV","B2_PWR_3","B2_PWR_4","UNUSED  ","UNUSED  ", \
+		                        "UNUSED  ","B2AVA183","B1M5MULT","B2M5_AMP","B2_PWR_1","B2_PWR_2"};
                                       // 4          5          6          7          8          9 
             const char *lotemp_descs[]={"UNUSED", \
-		                        "B1 LO Synthsizer 1", \
+		                        "B1 LO Synthsizer", \
 		                        "B1 LO Pwr Box 3", \
 		                        "B1 LO Pwr Box 4", \
 		                        "UNUSED", \
@@ -179,27 +217,39 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
 		                        "UNUSED", \
 		                        "B1 LO Pwr Box 1", \
 		                        "B1 LO Pwr Box 2", \
-		                        "B2 LO Pwr Box 1",
-		                        "B2 LO CTRL 1", \
-		                        "B2 LO CTRL 2", \
+		                        "B2 MK66FX uCTRL", \
+		                        "B2 Mult Driver", \
 		                        "B2 LO Pwr 3", \
 		                        "B2 LO Pwr 4", \
 		                        "UNUSED", \
 		                        "UNUSED", \
+		                        "UNUSED", \
 		                        "B2 LO X-band Amplifier", \
 		                        "B1 LO final tripler Ch5", \
-		                        "B2 LO LO Spacek amplifier Ch5", \
-		                        "B2 LO Pwr 1", \
-		                        "B2 LO Pwr 2"};
+		                        "B2 LO Spacek amplifier Ch5", \
+		                        "B2 LO Pwr Box 1", \
+		                        "B2 LO Pwr Box 2"};
 	    curl = init_influx();
-            sprintf(query, "&q=SELECT * FROM /^B1_AD590_*|B2_AD590_*/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
+            sprintf(query, "&q=SELECT * FROM /^B1_AD590_*/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
             influxReturn = influxWorker(curl, query);
 	    for (int i=0; i<influxReturn->length; i++){
-	       if( strcmp(lotemp_names[i], "UNUSED"))
+	       if( strcmp(lotemp_names[i], "UNUSED  ")){
                   fits_write_key(fptr, TFLOAT, lotemp_names[i], &influxReturn->value[i], lotemp_descs[i], &status);
+	       }
+	    }
+            freeinfluxStruct(influxReturn);
+	    // Not sure why yet, but I can't parse B1 AND B2 AD590s.  Do it again.
+	    curl = init_influx();
+            sprintf(query, "&q=SELECT * FROM /^B2_AD590_*/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
+            influxReturn = influxWorker(curl, query);
+	    for (int i=0; i<influxReturn->length; i++){
+	       if( strcmp(lotemp_names[i+12], "UNUSED  ")){
+                  fits_write_key(fptr, TFLOAT, lotemp_names[i+12], &influxReturn->value[i], lotemp_descs[i+12], &status);
+	       }
 	    }
             freeinfluxStruct(influxReturn);
 
+	    fits_write_comment(fptr, "   Cryogenic Temperatures", &status);
 	    // Cryogenic temps
             const char *cryo_descs[]=  {"temp inner shield (K)", \
 		                        "temp inner vapor shield (K)", \
@@ -306,11 +356,9 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
 	    // Various indices and keywords in the per row header that depend on Band #
             if (fits_header->unit==6){ //ACS5 B1
 	       tform[28] = "512E";
-               array_length=512;
 	    }
             if (fits_header->unit==4){ //ACS3 B2
 	       tform[28] = "1024E";
-               array_length=1024;
 	    }
 
 	    int tfields = 29;
@@ -326,7 +374,15 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
             return;
         }
     } ////////// END PRIMARY HEADER SECTION //////////
-    
+
+    // need to do this *again* because the one several lines back is only done for the fits file creation.
+    // that bug took a day to find.
+    if (fits_header->unit==6){ //ACS5 B1
+        array_length=512;
+    }
+    if (fits_header->unit==4){ //ACS3 B2
+        array_length=1024;
+    }
 
     // Move to the named HDU (where the table is stored)
     if (fits_movnam_hdu(fptr, BINARY_TBL, extname, 0, &status)) {
@@ -384,13 +440,11 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
     fits_write_col(fptr, TFLOAT,    28, nrows+1, 1, 1, &fits_header->gmon[mixer-1], &status);
 
 									     
-    /*
     // Write the spectra as a single 2*N column
     if (fits_write_col(fptr, TDOUBLE, 29, nrows+1, 1, 1 * array_length, array, &status)) {
         fits_report_error(stderr, status);  // Print any error message
         return;
     }
-    */
 
     // Close the FITS file
     if (fits_close_file(fptr, &status)) {
@@ -421,7 +475,7 @@ long get_seconds(const char *timestamp)
 
    strptime(timestamp, "%Y-%m-%dT%H:%M:%S", &t);
 
-   time_t seconds = mktime(&t);
+   time_t seconds = mktime(&t) - 25200;  //TODO: fix this hardcoded offset to UTC
 
    return (long) seconds;
 }
@@ -637,72 +691,12 @@ void const callback(char *filein){
    const char *header_names[]={"UNIT", "DEV", "NINT", "UNIXTIME", "FRAC", "NBYTES", "CORRTIME", \
 			       "EMPTY", "Ihigh", "Qhigh", "Ilow", "Qlow", "Ierr", "Qerr"};
 
-   ///////////// SLOW CADENCE HOUSEKEEPING - GOES INTO primary fits_header ////////////////
-   // Most recent HOT temperature from current scanID or ahead/behind 2 scanIDs
-   curl = init_influx();
-   sprintf(query, "&q=SELECT * FROM \"HK_TEMP11\"   WHERE \"scanID\"=~/^%s/ ORDER BY time DESC LIMIT 3", HOTregex);
-   influxReturn = influxWorker(curl, query);
-   THOT = influxReturn->value[0] + 273.13; //Kelvin -> Celsius
-   THOTID = influxReturn->scanID;
-
-   printf("time of THOTID is %s\t", influxReturn->time);
-   THOT_time = get_seconds(influxReturn->time);
-   printf("%ld\n", THOT_time);
-
-   freeinfluxStruct(influxReturn);
-
-   /////////// SLOW CADENCE HOUSEKEEPING - GOES INTO primary fits_header once //////////////
-   
-
-   ///////////// FAST CADENCE HOUSEKEEPING - GOES INTO per row fits_header  ////////////////
-   ///////////// but doesn't change every row, at most once every HOT       ////////////////
-
-   // LO Drive currents
-   curl = init_influx();
-   if (band==1){ //ACS5 B1
-      sprintf(query, "&q=SELECT * FROM /^PSatI_B1M2|PSatI_B1M3|PSatI_B1M4|PSatI_B1M6/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
-   }
-   if (band==2){ //ACS3 B2
-      sprintf(query, "&q=SELECT * FROM /^PSatI_B2M2|PSatI_B2M3|PSatI_B2M5|PSatI_B2M8/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
-   }
-   influxReturn = influxWorker(curl, query);
-   for (int i=0; i<influxReturn->length; i++){
-      LO_PSat[i] = influxReturn->value[i]; // LO Drive Currents (Amps)
-   }
-   freeinfluxStruct(influxReturn);
-   
-   // HEB Mixer Currents
-   curl = init_influx();
-   if (band==1){ //ACS5 B1
-      sprintf(query, "&q=SELECT * FROM /^biasCurB1M2|biasCurB1M3|biasCurB1M4|biasCurB1M6/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
-   }
-   if (band==2){ //ACS3 B2
-      sprintf(query, "&q=SELECT * FROM /^biasCurB2M2|biasCurB2M3|biasCurB2M5|biasCurB1M8/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
-   }
-   influxReturn = influxWorker(curl, query);
-   for (int i=0; i<influxReturn->length; i++){
-      HEBImon[i] = influxReturn->value[i]; // Mixer Currents (mA)
-   }
-   freeinfluxStruct(influxReturn);
-
-   // LO Gate Monitor
-   curl = init_influx();
-   if (band==1){ //ACS5 B1
-      sprintf(query, "&q=SELECT * FROM /^B1_GMONI_2|B1_GMONI_3|B1_GMONI_4|B1_GMONI_6/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
-   }
-   if (band==2){ //ACS3 B2
-      sprintf(query, "&q=SELECT * FROM /^B2_GMONI_2|B2_GMONI_3|B2_GMONI_5|B2_GMONI_8/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
-   }
-   influxReturn = influxWorker(curl, query);
-   for (int i=0; i<influxReturn->length; i++){
-      LO_Gmon[i] = influxReturn->value[i]; // Mixer Currents (mA)
-   }
-   freeinfluxStruct(influxReturn);
-   ///////////// FAST CADENCE HOUSEKEEPING - GOES INTO per row fits_header ////////////////
 
 
 //////////////////////////////  LOOP OVER ALL SPECTRA IN FILE  ///////////////////////////////////
 
+
+   int gotHot = 0; //have we gotten the per row h/k based on unixtime yet?
 
    // Start at beginning of data file
    for (int j=0; j<(int)sz/bps; j++)
@@ -732,6 +726,8 @@ void const callback(char *filein){
       printf("The type is %s\n", prefix);
       // Loop over header location
       for (int i=0; i<22; i++){
+
+
          if (i==3){
             //UNIXTIME is 64 bits
             fread(&value1, 4, 1, fp); //Least significant 32 bits
@@ -745,6 +741,79 @@ void const callback(char *filein){
          header[i] = (value);
       }
       // data file *fp is now at start of lag data
+	 if(!gotHot)
+	 {
+                 // Most recent HOT temperature from current scanID or ahead/behind 2 scanIDs
+                 // sigh.  InfluxDB v1.8 doesn't have an abs() function, so two queries sorted by time are
+                 // needed to find the *nearest* hot load temp relative to a timestamp. TODO: test whether scanID regex helps speed
+                 int time1, time2;
+                 int scanID1, scanID2;
+                 float temp1, temp2;
+
+                 curl = init_influx();
+                 sprintf(query, "&q=SELECT * FROM \"HK_TEMP11\"   WHERE time>=%ld000000000 ORDER by time  ASC LIMIT 1", UNIXTIME);
+                 influxReturn = influxWorker(curl, query);
+                 time1   = get_seconds(influxReturn->time);
+                 scanID1 = influxReturn->scanID;
+                 temp1   = influxReturn->value[0];
+                 freeinfluxStruct(influxReturn);
+
+                 curl = init_influx();
+                 sprintf(query, "&q=SELECT * FROM \"HK_TEMP11\"   WHERE time<=%ld000000000 ORDER by time DESC LIMIT 1", UNIXTIME);
+                 influxReturn = influxWorker(curl, query);
+                 time2   = get_seconds(influxReturn->time);
+                 scanID2 = influxReturn->scanID;
+                 temp2   = influxReturn->value[0];
+
+                 THOT = influxReturn->value[0] + 273.13; //Kelvin -> Celsius
+                 THOTID = influxReturn->scanID;
+                 freeinfluxStruct(influxReturn);
+
+                 // LO Drive currents
+                 curl = init_influx();
+                 if (band==1){ //ACS5 B1
+                    sprintf(query, "&q=SELECT * FROM /^PSatI_B1M2|PSatI_B1M3|PSatI_B1M4|PSatI_B1M6/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
+                 }
+                 if (band==2){ //ACS3 B2
+                    sprintf(query, "&q=SELECT * FROM /^PSatI_B2M2|PSatI_B2M3|PSatI_B2M5|PSatI_B2M8/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
+                 }
+                 influxReturn = influxWorker(curl, query);
+                 for (int i=0; i<influxReturn->length; i++){
+                    LO_PSat[i] = influxReturn->value[i]; // LO Drive Currents (Amps)
+                 }
+                 freeinfluxStruct(influxReturn);
+   
+                 // HEB Mixer Currents
+                 curl = init_influx();
+                 if (band==1){ //ACS5 B1
+                    sprintf(query, "&q=SELECT * FROM /^biasCurB1M2|biasCurB1M3|biasCurB1M4|biasCurB1M6/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
+                 }
+                 if (band==2){ //ACS3 B2
+                    sprintf(query, "&q=SELECT * FROM /^biasCurB2M2|biasCurB2M3|biasCurB2M5|biasCurB1M8/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
+                 }
+                 influxReturn = influxWorker(curl, query);
+                 for (int i=0; i<influxReturn->length; i++){
+                    HEBImon[i] = influxReturn->value[i]; // Mixer Currents (mA)
+                 }
+                 freeinfluxStruct(influxReturn);
+
+                 // LO Gate Monitor
+                 curl = init_influx();
+                 if (band==1){ //ACS5 B1
+                    sprintf(query, "&q=SELECT * FROM /^B1_GMONI_2|B1_GMONI_3|B1_GMONI_4|B1_GMONI_6/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
+                 }
+                 if (band==2){ //ACS3 B2
+                    sprintf(query, "&q=SELECT * FROM /^B2_GMONI_2|B2_GMONI_3|B2_GMONI_5|B2_GMONI_8/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
+                 }
+                 influxReturn = influxWorker(curl, query);
+                 for (int i=0; i<influxReturn->length; i++){
+                    LO_Gmon[i] = influxReturn->value[i]; // Mixer Currents (mA)
+                 }
+                 freeinfluxStruct(influxReturn);
+
+		 gotHot = 1;
+                 ///////////// FAST CADENCE HOUSEKEEPING - GOES INTO per row fits_header ////////////////
+	 }
 
       // fill variables from header array
       UNIT          = header[0];
@@ -1188,7 +1257,7 @@ void const callback(char *filein){
       fits_header->unixtime = (int) UNIXTIME;
       fits_header->frac     = FRAC;
       fits_header->nbytes   = NBYTES;
-      fits_header->corrtime = corr.corrtime;
+      fits_header->corrtime = (int) corr.corrtime;
       fits_header->inttime  =(corr.corrtime*256.)/(FS_FREQ*1000000.);
 
       fits_header->Ihi      = corr.Ihi;
@@ -1230,7 +1299,9 @@ void const callback(char *filein){
       // 
       char fitsfile[20];
       if ( strstr(prefix, "REF") )
+      {
          sprintf(fitsfile, "ACS%d_%05d.fits", UNIT-1, scanID-1); // if REF, then put in previous OTF/HOT scanID fits file
+      }
       else
          sprintf(fitsfile, "ACS%d_%05d.fits", UNIT-1, scanID);
       if (DEBUG)
