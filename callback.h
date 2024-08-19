@@ -29,9 +29,9 @@ struct corrType
 typedef struct s_header {
 	int		unit;
 	int		dev;
+	int		mixer;
 	int		nint;
-	int		unixtime;
-	float           frac;
+	double		fulltime;
 	int		nbytes;
 	int  		corrtime;
 	float		inttime;
