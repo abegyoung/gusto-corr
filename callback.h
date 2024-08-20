@@ -3,6 +3,7 @@
 #include <fftw3.h>
 #include <sys/time.h>
 #include <Python.h>
+#include <stdbool.h>
 
 
 
@@ -91,6 +92,6 @@ typedef struct s_header {
 
 #ifdef NO_FS
 
-void const callback(char *filein);
+void const callback(char *filein, int refhot);
 
 #endif

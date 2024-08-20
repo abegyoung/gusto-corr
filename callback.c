@@ -518,7 +518,7 @@ void const callback(struct inotify_event *event, const char *directory){
 #endif
 
 #ifdef NO_FS
-void const callback(char *filein){
+void const callback(char *filein, int isREFHOT){
    char *fullpath= malloc(48*sizeof(char));
    strcpy(fullpath, filein); // make a copy leaving filein intact for later tokenization
 
@@ -592,7 +592,7 @@ void const callback(char *filein){
    char *token;
    int position = 0;
    int band    = -1;
-   char *prefix=malloc(4*sizeof(char));;
+   char *prefix=malloc(7*sizeof(char));;
    int scanID  = -1;
    int subScan = -1;
 
@@ -644,6 +644,11 @@ void const callback(char *filein){
       }
 
       position++;
+   }
+
+   // override scan_type from filename
+   if( isREFHOT ){
+      strncpy(prefix, "REFHOT\0", 7);
    }
 
 
@@ -770,10 +775,11 @@ void const callback(char *filein){
                  // LO Drive currents
                  curl = init_influx();
                  if (band==1){ //ACS5 B1
-                    sprintf(query, "&q=SELECT * FROM /^PSatI_B1M2|PSatI_B1M3|PSatI_B1M4|PSatI_B1M6/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
+                    sprintf(query, "&q=SELECT * FROM /^PSatI_B1M2|PSatI_B1M3|PSatI_B1M4|PSatI_B1M6/ WHERE time<=%ld000000000 ORDER by time DESC LIMIT 1", UNIXTIME);
                  }
                  if (band==2){ //ACS3 B2
-                    sprintf(query, "&q=SELECT * FROM /^PSatI_B2M2|PSatI_B2M3|PSatI_B2M5|PSatI_B2M8/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
+                    sprintf(query, "&q=SELECT * FROM /^PSatI_B2M2|PSatI_B2M3|PSatI_B2M5|PSatI_B2M8/ WHERE time<=%ld000000000 ORDER by time DESC LIMIT 1", UNIXTIME);
+		    printf("%s\n", query);
                  }
                  influxReturn = influxWorker(curl, query);
                  for (int i=0; i<influxReturn->length; i++){
@@ -784,10 +790,10 @@ void const callback(char *filein){
                  // HEB Mixer Currents
                  curl = init_influx();
                  if (band==1){ //ACS5 B1
-                    sprintf(query, "&q=SELECT * FROM /^biasCurB1M2|biasCurB1M3|biasCurB1M4|biasCurB1M6/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
+                    sprintf(query, "&q=SELECT * FROM /^biasCurB1M2|biasCurB1M3|biasCurB1M4|biasCurB1M6/ WHERE time<=%ld000000000 ORDER by time DESC LIMIT 1", UNIXTIME);
                  }
                  if (band==2){ //ACS3 B2
-                    sprintf(query, "&q=SELECT * FROM /^biasCurB2M2|biasCurB2M3|biasCurB2M5|biasCurB1M8/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
+                    sprintf(query, "&q=SELECT * FROM /^biasCurB2M2|biasCurB2M3|biasCurB2M5|biasCurB2M8/ WHERE time<=%ld000000000 ORDER by time DESC LIMIT 1", UNIXTIME);
                  }
                  influxReturn = influxWorker(curl, query);
                  for (int i=0; i<influxReturn->length; i++){
@@ -798,10 +804,10 @@ void const callback(char *filein){
                  // LO Gate Monitor
                  curl = init_influx();
                  if (band==1){ //ACS5 B1
-                    sprintf(query, "&q=SELECT * FROM /^B1_GMONI_2|B1_GMONI_3|B1_GMONI_4|B1_GMONI_6/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
+                    sprintf(query, "&q=SELECT * FROM /^B1_GMONI_2|B1_GMONI_3|B1_GMONI_4|B1_GMONI_6/ WHERE time<=%ld000000000 ORDER by time DESC LIMIT 1", UNIXTIME);
                  }
                  if (band==2){ //ACS3 B2
-                    sprintf(query, "&q=SELECT * FROM /^B2_GMONI_2|B2_GMONI_3|B2_GMONI_5|B2_GMONI_8/ WHERE scanID=~/^%d/ LIMIT 1", THOTID);
+                    sprintf(query, "&q=SELECT * FROM /^B2_GMONI_2|B2_GMONI_3|B2_GMONI_5|B2_GMONI_8/ WHERE time<=%ld000000000 ORDER by time DESC LIMIT 1", UNIXTIME);
                  }
                  influxReturn = influxWorker(curl, query);
                  for (int i=0; i<influxReturn->length; i++){
@@ -832,13 +838,10 @@ void const callback(char *filein){
       // Since we know UNIT and NLAGS, set correlator frequency and fits spectrum for later use
       // And also secret decoder ring (unit,dev) -> (Mixer #)
       int mixerTable[2][4] = {
-	      //{2, 3, 4, 6},	// band 1 mixers
-	      //{2, 3, 5, 8}	// band 2 mixers
-	      {1, 2, 3, 4},	// band 1 mixers
-	      {5, 6, 7, 8}	// band 2 mixers
+	      {2, 3, 4, 6},	// band 1 mixers
+	      {2, 3, 5, 8}	// band 2 mixers
       };
       MIXER = mixerTable[band-1][DEV-1];
-      printf("band=%d\tdev=%d\tmixer=%d\n", band, DEV, MIXER);
       if (band==1){ //ACS5 B1
          FS_FREQ = 5000.;
       }
@@ -1302,18 +1305,26 @@ void const callback(char *filein){
       }
 
       // Let's try out CFITSIO!
-      // edit: 8/9/24 instead of 3 files (hot,otf,ref) for each scanID, combine to one.
-      // 
+      // edit: 8/09/24 instead of 3 files (hot,otf,ref) for each scanID, combine to one.
+      // edit: 8/20/24 added logic to bookend REFs and REF HOTs
       char fitsfile[20];
-      if ( strstr(prefix, "REF") )
+      if ( strstr(prefix, "REF\0") || isREFHOT)
       {
-         sprintf(fitsfile, "ACS%d_%05d.fits", UNIT-1, scanID-1); // if REF, then put in previous OTF/HOT scanID fits file
+         // send the header, data, and fits filename to be compiled & written TWICE
+         sprintf(fitsfile, "ACS%d_%05d.fits", UNIT-1, scanID-1); // if REF or HOTREF, then put in previous fits file
+         append_to_fits_table(fitsfile, fits_header, array, THOTID); 
+
+         sprintf(fitsfile, "ACS%d_%05d.fits", UNIT-1, scanID+1); // if REF or HOTREF, then bookend fits files
+         append_to_fits_table(fitsfile, fits_header, array, THOTID); 
       }
       else
+      {
+         // send the header, data, and fits filename to be compiled & written
          sprintf(fitsfile, "ACS%d_%05d.fits", UNIT-1, scanID);
+         append_to_fits_table(fitsfile, fits_header, array, THOTID); 
+      }
       if (DEBUG)
          printf("%s\n", fitsfile);
-      append_to_fits_table(fitsfile, fits_header, array, THOTID);
 
 
       // Free items before next spectra within this file

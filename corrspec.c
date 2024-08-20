@@ -11,8 +11,10 @@
 #include <arpa/inet.h>
 #include "corrspec.h"
 #include "callback.h"
+#include "search_glob.h"
 #include <glob.h>
 #include <Python.h>
+#include <stdbool.h>
 
 #include <signal.h>
 #include <errno.h>
@@ -154,7 +156,11 @@ int main(int argc, char **argv) {
 
 #ifdef NO_FS
 
+   int isHOT    = 0;
+   int isREFHOT = 0;
    glob_t glob_result;
+   char *idstr   = malloc(6*sizeof(char));;
+   char *typestr = malloc(4*sizeof(char));;
 
    if(glob(argv[1], GLOB_ERR, NULL, &glob_result) != 0){
       perror("Error in glob\n");
@@ -164,8 +170,27 @@ int main(int argc, char **argv) {
    for (size_t i=0; i < glob_result.gl_pathc; ++i){
       // Process each file
       printf("processing file: %s\n", glob_result.gl_pathv[i]);
-      callback( glob_result.gl_pathv[i]);
 
+      strncpy(typestr, glob_result.gl_pathv[i]+19, 3);	// pull out scanID
+      typestr[3]='\0';					// null terminate
+      if ( strstr(typestr, "HOT\0") )
+         isHOT = 1;
+
+      strncpy(idstr, glob_result.gl_pathv[i]+23, 5);	// pull out scanID
+      idstr[5]='\0';					// null terminate
+      int scanID = atoi(idstr);
+
+      // Is the file a REF HOT?
+      if ( search_glob_results(glob_result, scanID) && isHOT )	// check scanID for "REF"
+         isREFHOT = 1;
+      printf("isREFHOT? %d\n", isREFHOT);
+
+      // Send file to be processed
+      callback( glob_result.gl_pathv[i], isREFHOT);
+
+      // reset vars
+      isHOT    = 0;
+      isREFHOT = 0;
    }
 
 #endif
