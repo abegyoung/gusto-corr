@@ -796,14 +796,10 @@ void const callback(char *filein, int isREFHOT){
                  if (band==2){ //ACS3 B2
                     sprintf(query, "&q=SELECT * FROM /^PSatI_B2M2|PSatI_B2M3|PSatI_B2M5|PSatI_B2M8/ WHERE time<=%ld000000000 ORDER by time DESC LIMIT 1", UNIXTIME);
                  }
-		 printf("%s\n", query);
                  influxReturn = influxWorker(curl, query);
                  for (int i=0; i<influxReturn->length; i++){
                     LO_PSat[i] = influxReturn->value[i]; // LO Drive Currents (Amps)
                  }
-                 for (int i=0; i<influxReturn->length; i++){
-			 printf("%s\t%f\n", influxReturn->name[i], influxReturn->value[i]);
-		 }
                  freeinfluxStruct(influxReturn);
    
                  // HEB Mixer Currents
@@ -1323,7 +1319,7 @@ void const callback(char *filein, int isREFHOT){
       // Construct the FITS DATA
       double *array = malloc(2*N*sizeof(double));
       for (int i=0; i<2*N; i++){
-         array[i] = (FS_FREQ*1e6)/(corr.corrtime*256.) * sqrt(P_I*P_Q) * sqrt(pow(spec[specA].out[i][0],2)+pow(spec[specA].out[i][1],2));
+         array[i] = sqrt(P_I*P_Q) * sqrt(pow(spec[specA].out[i][0],2)+pow(spec[specA].out[i][1],2));
       }
 
       // Let's try out CFITSIO!
