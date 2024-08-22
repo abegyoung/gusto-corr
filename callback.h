@@ -36,6 +36,8 @@ typedef struct s_header {
 	int		nbytes;
 	int  		corrtime;
 	float		inttime;
+	uint32_t	row_flag;
+	uint16_t	channel_flag;
 	int		Ihi;
 	int		Qhi;
 	int		Ilo;

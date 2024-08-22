@@ -165,6 +165,7 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
             fits_write_key(fptr, TSTRING, "DLEVEL",    "0.7",      "data level",      &status);
 	    get_proctime(proctime);
             fits_write_key(fptr, TSTRING, "Proctime",  proctime,  "processing time", &status);
+            fits_write_key(fptr, TINT,    "SER_FLAG",  "0",       "SERIES FLAG",     &status);
 
 	    fits_write_comment(fptr, "  Housekeeping Temperatures", &status);
 	    // Ambient HK_TEMP           0          1          2          3          4          5          6          7          
@@ -316,13 +317,14 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
 
 
             // Define the column parameters
-            char *ttype[] ={"MIXER", "NINT", "UNIXTIME", "NBYTES", "CORRTIME", "INTTIME", "Ihigh", \
+            char *ttype[] ={"MIXER", "NINT", "UNIXTIME", "NBYTES", "CORRTIME", "INTTIME", "ROW_FLAG", "Ihigh", \
 			    "Qhigh", "Ilow", "Qlow", "Ierr", "Qerr", "VIhi", "VQhi", "VIlo", "VQlo", "scanID", \
-		            "subScan", "scan_type", "THOT", "RA", "DEC", "filename", "PSat", "Imon", "Gmon", "spec"};
+		            "subScan", "scan_type", "THOT", "RA", "DEC", "filename", "PSat", "Imon", "Gmon",   \
+			    "spec", "CHANNEL_FLAG"};
 
-            char *tunit[] ={" ", " ", " ", " ", "sec", " ", " ", "sec", "counts", "counts", \
-			    "counts", "counts", " ", " ", "Volts", "Volts", "Volts", "Volts", " ", \
-		            " ", " ", "Kelvin", "degrees", "degrees", "text", "Amps", "uA", "Amps", " "};
+            char *tunit[] ={" ", " ", "sec", " ", " ", "sec", " ", "counts", "counts", "counts",   \
+			    "counts", " ", " ", "Volts", "Volts", "Volts", "Volts", " ", " ", " ", \
+		            "Kelvin", "degrees", "degrees", "text", "Amps", "uA", "Amps", " ", " "};
 
 	    // All header values are signed 32-bit except UNIXTIME which is uint64_t
             char *tform[29];
@@ -332,35 +334,38 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
 	    tform[3]  = "1J"; //int	nbytes
 	    tform[4]  = "1J"; //int     corrtime
 	    tform[5]  = "1E"; //float   integration time
-            tform[6]  = "1J"; //int	ihi
-            tform[7]  = "1J"; //int	qhi
-            tform[8]  = "1J"; //int	ilo
-            tform[9]  = "1J"; //int	qlo
-            tform[10] = "1J"; //int	ierr
-            tform[11] = "1J"; //int	qerr
-            tform[12] = "1E"; //float	Vdac
+            tform[6]  = "1J"; //32 bit row flag
+            tform[7]  = "1J"; //int	ihi
+            tform[8]  = "1J"; //int	qhi
+            tform[9]  = "1J"; //int	ilo
+            tform[10] = "1J"; //int	qlo
+            tform[11] = "1J"; //int	ierr
+            tform[12] = "1J"; //int	qerr
             tform[13] = "1E"; //float	Vdac
             tform[14] = "1E"; //float	Vdac
             tform[15] = "1E"; //float	Vdac
-            tform[16] = "1J"; //int	scanID
-            tform[17] = "1J"; //int	subScan
-            tform[18] = "6A"; //char    scan type
-            tform[19] = "1E"; //float	THOT
-            tform[20] = "1E"; //float	RA
-            tform[21] = "1E"; //float	DEC
-	    tform[22] = "48A";//char    filename
-            tform[23] = "1E"; //float	PSat
-            tform[24] = "1E"; //float	Imon
-	    tform[25] = "1E"; //float   Gmon
+            tform[16] = "1E"; //float	Vdac
+            tform[17] = "1J"; //int	scanID
+            tform[18] = "1J"; //int	subScan
+            tform[19] = "6A"; //char    scan type
+            tform[20] = "1E"; //float	THOT
+            tform[21] = "1E"; //float	RA
+            tform[22] = "1E"; //float	DEC
+	    tform[23] = "48A";//char    filename
+            tform[24] = "1E"; //float	PSat
+            tform[25] = "1E"; //float	Imon
+	    tform[26] = "1E"; //float   Gmon
 	    // Various indices and keywords in the per row header that depend on Band #
             if (fits_header->unit==6){ //ACS5 B1
-	       tform[26] = "512E";
+	       tform[27] = "512E";  //32 bit float
+	       tform[28] = "512I";  //16 bit int
 	    }
             if (fits_header->unit==4){ //ACS3 B2
-	       tform[26] = "1024E";
+	       tform[27] = "1024E";  //32 bit float
+	       tform[28] = "1024I";  //16 bit int
 	    }
 
-	    int tfields = 27;
+	    int tfields = 29;
 
             // Create a binary table
             if (fits_create_tbl(fptr, BINARY_TBL, 0, tfields ,ttype, tform, tunit, extname, &status)) {
@@ -408,37 +413,48 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
     fits_write_col(fptr, TINT32BIT,  4, nrows+1, 1, 1, &fits_header->nbytes,   &status);
     fits_write_col(fptr, TINT32BIT,  5, nrows+1, 1, 1, &fits_header->corrtime, &status);
     fits_write_col(fptr, TFLOAT,     6, nrows+1, 1, 1, &fits_header->inttime,  &status);
+    fits_write_col(fptr, TINT32BIT,  7, nrows+1, 1, 1, &fits_header->row_flag, &status);
 
-    fits_write_col(fptr, TINT32BIT,  7, nrows+1, 1, 1, &fits_header->Ihi,      &status);
-    fits_write_col(fptr, TINT32BIT,  8, nrows+1, 1, 1, &fits_header->Qhi,      &status);
-    fits_write_col(fptr, TINT32BIT,  9, nrows+1, 1, 1, &fits_header->Ilo,      &status);
-    fits_write_col(fptr, TINT32BIT, 10, nrows+1, 1, 1, &fits_header->Qlo,      &status);
-    fits_write_col(fptr, TINT32BIT, 11, nrows+1, 1, 1, &fits_header->Ierr,     &status);
-    fits_write_col(fptr, TINT32BIT, 12, nrows+1, 1, 1, &fits_header->Qerr,     &status);
+    fits_write_col(fptr, TINT32BIT,  8, nrows+1, 1, 1, &fits_header->Ihi,      &status);
+    fits_write_col(fptr, TINT32BIT,  9, nrows+1, 1, 1, &fits_header->Qhi,      &status);
+    fits_write_col(fptr, TINT32BIT, 10, nrows+1, 1, 1, &fits_header->Ilo,      &status);
+    fits_write_col(fptr, TINT32BIT, 11, nrows+1, 1, 1, &fits_header->Qlo,      &status);
+    fits_write_col(fptr, TINT32BIT, 12, nrows+1, 1, 1, &fits_header->Ierr,     &status);
+    fits_write_col(fptr, TINT32BIT, 13, nrows+1, 1, 1, &fits_header->Qerr,     &status);
 
-    fits_write_col(fptr, TFLOAT,    13, nrows+1, 1, 1, &fits_header->VIhi,     &status);
-    fits_write_col(fptr, TFLOAT,    14, nrows+1, 1, 1, &fits_header->VQhi,     &status);
-    fits_write_col(fptr, TFLOAT,    15, nrows+1, 1, 1, &fits_header->VIlo,     &status);
-    fits_write_col(fptr, TFLOAT,    16, nrows+1, 1, 1, &fits_header->VQlo,     &status);
+    fits_write_col(fptr, TFLOAT,    14, nrows+1, 1, 1, &fits_header->VIhi,     &status);
+    fits_write_col(fptr, TFLOAT,    15, nrows+1, 1, 1, &fits_header->VQhi,     &status);
+    fits_write_col(fptr, TFLOAT,    16, nrows+1, 1, 1, &fits_header->VIlo,     &status);
+    fits_write_col(fptr, TFLOAT,    17, nrows+1, 1, 1, &fits_header->VQlo,     &status);
 									       
-    fits_write_col(fptr, TINT32BIT, 17, nrows+1, 1, 1, &fits_header->scanID,   &status);
-    fits_write_col(fptr, TINT32BIT, 18, nrows+1, 1, 1, &fits_header->subScan,  &status);
-    fits_write_col(fptr, TSTRING,   19, nrows+1, 1, 1, &fits_header->type,     &status);
-    fits_write_col(fptr, TFLOAT,    20, nrows+1, 1, 1, &fits_header->THOT,     &status);
-    fits_write_col(fptr, TFLOAT,    21, nrows+1, 1, 1, &fits_header->RA,       &status);
-    fits_write_col(fptr, TFLOAT,    22, nrows+1, 1, 1, &fits_header->DEC,      &status);
+    fits_write_col(fptr, TINT32BIT, 18, nrows+1, 1, 1, &fits_header->scanID,   &status);
+    fits_write_col(fptr, TINT32BIT, 19, nrows+1, 1, 1, &fits_header->subScan,  &status);
+    fits_write_col(fptr, TSTRING,   20, nrows+1, 1, 1, &fits_header->type,     &status);
+    fits_write_col(fptr, TFLOAT,    21, nrows+1, 1, 1, &fits_header->THOT,     &status);
+    fits_write_col(fptr, TFLOAT,    22, nrows+1, 1, 1, &fits_header->RA,       &status);
+    fits_write_col(fptr, TFLOAT,    23, nrows+1, 1, 1, &fits_header->DEC,      &status);
 
-    fits_write_col(fptr, TSTRING,   23, nrows+1, 1, 1, &fits_header->filename, &status);
+    fits_write_col(fptr, TSTRING,   24, nrows+1, 1, 1, &fits_header->filename, &status);
 
     // these change based on which mixer
-    int mixer = fits_header->dev;
-    fits_write_col(fptr, TFLOAT,    24, nrows+1, 1, 1, &fits_header->psat[mixer-1], &status);
-    fits_write_col(fptr, TFLOAT,    25, nrows+1, 1, 1, &fits_header->imon[mixer-1], &status);
-    fits_write_col(fptr, TFLOAT,    26, nrows+1, 1, 1, &fits_header->gmon[mixer-1], &status);
+    // DEV 1 = B2M2 =  psat[3]
+    // DEV 2 = B2M3 =  psat[2]
+    // DEV 3 = B2M5 =  psat[1]
+    // DEV 4 = B2M8 =  psat[0]
+    //
+    int psat_index = (-1*fits_header->dev)+4;
+    fits_write_col(fptr, TFLOAT,    25, nrows+1, 1, 1, &fits_header->psat[psat_index], &status);
+    fits_write_col(fptr, TFLOAT,    26, nrows+1, 1, 1, &fits_header->imon[psat_index], &status);
+    fits_write_col(fptr, TFLOAT,    27, nrows+1, 1, 1, &fits_header->gmon[psat_index], &status);
 
 									     
     // Write the spectra as a single 2*N column
-    if (fits_write_col(fptr, TDOUBLE, 27, nrows+1, 1, 1 * array_length, array, &status)) {
+    if (fits_write_col(fptr, TDOUBLE, 28, nrows+1, 1, 1 * array_length, array, &status)) {
+        fits_report_error(stderr, status);  // Print any error message
+        return;
+    }
+    // Write the channel flag as a single 2*N column
+    if (fits_write_col(fptr, TDOUBLE, 29, nrows+1, 1, 1 * array_length, array, &status)) {
         fits_report_error(stderr, status);  // Print any error message
         return;
     }
@@ -779,12 +795,15 @@ void const callback(char *filein, int isREFHOT){
                  }
                  if (band==2){ //ACS3 B2
                     sprintf(query, "&q=SELECT * FROM /^PSatI_B2M2|PSatI_B2M3|PSatI_B2M5|PSatI_B2M8/ WHERE time<=%ld000000000 ORDER by time DESC LIMIT 1", UNIXTIME);
-		    printf("%s\n", query);
                  }
+		 printf("%s\n", query);
                  influxReturn = influxWorker(curl, query);
                  for (int i=0; i<influxReturn->length; i++){
                     LO_PSat[i] = influxReturn->value[i]; // LO Drive Currents (Amps)
                  }
+                 for (int i=0; i<influxReturn->length; i++){
+			 printf("%s\t%f\n", influxReturn->name[i], influxReturn->value[i]);
+		 }
                  freeinfluxStruct(influxReturn);
    
                  // HEB Mixer Currents
@@ -1263,12 +1282,15 @@ void const callback(char *filein, int isREFHOT){
       fits_header->gmon  = (float *)malloc(4);
 
       fits_header->unit     = UNIT;
+      fits_header->dev      = DEV;
       fits_header->mixer    = MIXER;
       fits_header->nint     = NINT;
       fits_header->fulltime = (double) UNIXTIME + 0.001*FRAC;
       fits_header->nbytes   = NBYTES;
       fits_header->corrtime = (int) corr.corrtime;
       fits_header->inttime  =(corr.corrtime*256.)/(FS_FREQ*1000000.);
+      fits_header->row_flag = 0;
+      fits_header->channel_flag = 0;
 
       fits_header->Ihi      = corr.Ihi;
       fits_header->Qhi      = corr.Qhi;
