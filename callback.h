@@ -6,6 +6,8 @@
 #include <stdbool.h>
 
 
+// function to process correlator lag file
+void const callback(char *filein, int refhot);
 
 // structure to hold lag data
 struct corrType
@@ -27,6 +29,7 @@ struct corrType
    float *QQqc;            //32 bit QQ lag values (normlized float quantization corrected)
 };
 
+// structure to hold fits header pointer
 typedef struct s_header {
 	int		unit;
 	int		dev;
@@ -65,35 +68,3 @@ typedef struct s_header {
 } s_header;
 
 
-
-#ifdef USE_FSWATCH
-
-   #include <libfswatch/c/libfswatch.h>
-
-   void const callback(const fsw_cevent *events, const unsigned int event_num, void * data);
-/*
-0       NoOp
-1<<0    PlatformSpecific
-1<<1    Created
-1<<2    Updated
-1<<6    AttributeModified
-1<<8    MovedTo
-1<<9    IsFile
-*/
-#endif
-
-#if USE_INOTIFY
-
-   #define EVENT_SIZE (sizeof (struct inotify_event))
-   #define EVENT_BUF_LEN (1024*(EVENT_SIZE+16))
-
-   #include <sys/inotify.h>
-   void const callback(struct inotify_event *event, const char *directory);
-
-#endif
-
-#ifdef NO_FS
-
-void const callback(char *filein, int refhot);
-
-#endif

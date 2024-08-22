@@ -512,28 +512,6 @@ char nthdigit(int x, int n)
 
 
 // Callback function to process the file
-// Function definition changes for FSWATCH or INOTIFY or NO_FS
-#ifdef USE_FSWATCH
-void const callback(const fsw_cevent *events,const unsigned int event_num, void *data){
-
-   char *filein= events->path;
-   // for fswatch, get just the filename, not path
-   char *name;
-   char *last = strrchr(filein, '/');
-   if (last != NULL) {
-      sprintf(name, "%s", last+1);
-   }
-#endif
-
-#if USE_INOTIFY
-void const callback(struct inotify_event *event, const char *directory){
-
-   char filein[128];
-   snprintf(filein, 128, "%s/%s", directory, event->name);
-   char *name = event->name;
-#endif
-
-#ifdef NO_FS
 void const callback(char *filein, int isREFHOT){
    char *fullpath= malloc(48*sizeof(char));
    strcpy(fullpath, filein); // make a copy leaving filein intact for later tokenization
@@ -545,7 +523,7 @@ void const callback(char *filein, int isREFHOT){
    } else {
 	   datafile = fullpath;
    }
-#endif
+
 
    //char errfile[64] = "err.log";
 
