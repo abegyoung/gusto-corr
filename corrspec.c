@@ -46,12 +46,8 @@ static void handler(int sig, siginfo_t *si, void *unused)
 
 int main(int argc, char **argv) {
 
-   void *data;
-   int isHOT    = 0;
    int isREFHOT = 0;
    glob_t glob_result;
-   char *idstr   = malloc(6*sizeof(char));;
-   char *typestr = malloc(4*sizeof(char));;
 
    // Set up SIGSEGV handler
    struct sigaction sa;
@@ -96,35 +92,41 @@ int main(int argc, char **argv) {
    printf("ready to start\n");
 
 
-   if(glob(argv[1], GLOB_ERR, NULL, &glob_result) != 0){
+   // Get a list of ALL data files in a directory.  Only use for yes/no process and isREFHOT?
+   if(glob("ACS*_*_*_*.dat", GLOB_ERR, NULL, &glob_result) != 0){
       perror("Error in glob\n");
       return 1;
    }
 
-   for (size_t i=0; i < glob_result.gl_pathc; ++i){
-      // Process each file
-      printf("processing file: %s\n", glob_result.gl_pathv[i]);
 
-      strncpy(typestr, glob_result.gl_pathv[i]+19, 3);	// pull out scanID
-      typestr[3]='\0';					// null terminate
-      if ( strstr(typestr, "HOT\0") )
-         isHOT = 1;
+   int unit = 3;
+   char *filename = malloc(23*sizeof(char));
+   const char *prefix_names[]={"HOT", "OTF", "REF"};
 
-      strncpy(idstr, glob_result.gl_pathv[i]+23, 5);	// pull out scanID
-      idstr[5]='\0';					// null terminate
-      int scanID = atoi(idstr);
+   // Make a list of files to process
+   for (int scanid=14544; scanid<=14555; scanid++){
+      for(int subscan=0; subscan<50; subscan++){
+         for(int type=0; type<3; type++){
+            sprintf(filename, "ACS%d_%s_%05d_%04d.dat", unit, prefix_names[type], scanid, subscan);
+	    filename[23] = '\0';
 
-      // Is the file a REF HOT?
-      if ( search_glob_results(glob_result, scanID) && isHOT )	// check scanID for "REF"
-         isREFHOT = 1;
-      printf("isREFHOT? %d\n", isREFHOT);
+            if (file_exists(filename)) {
+               // Process each file
+               printf("processing file: %s\n", filename);
 
-      // Send file to be processed
-      callback( glob_result.gl_pathv[i], isREFHOT);
+               // Is the file a REF HOT?
+               if ( search_glob_results(glob_result, scanid) && (type==0) )	// check scanID for "REF"
+                  isREFHOT = 1;
+               printf("isREFHOT? %d\n", isREFHOT);
 
-      // reset vars
-      isHOT    = 0;
-      isREFHOT = 0;
+               // Send file to be processed
+               callback(filename, isREFHOT);
+
+               // reset vars
+               isREFHOT = 0;
+            }
+         }
+      }
    }
 
    // Clean up Python calls

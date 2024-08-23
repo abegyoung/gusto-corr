@@ -578,8 +578,8 @@ void const callback(char *filein, int isREFHOT){
    float LO_Gmon[4];
    long THOT_time;	// time at which HK_TEMP11 was taken (seconds since epoch)
 
-   // notification
-   printf("File changed: %s\n", filein);
+   // file open notification
+   printf("opened file: %s\n", filein);
    fp = fopen(filein, "r");
 
    // tokenize scanID from filename
@@ -601,12 +601,12 @@ void const callback(char *filein, int isREFHOT){
 
    // Use strtok to tokenize the filename using underscores as delimiters
    // First use "/" to redact any relative path
-   token = strtok(filein, "/");
-   token = strtok(NULL, "/");
+   //token = strtok(filein, "/");
+   //token = strtok(NULL, "/");
+   token = strtok(filein, "_");
 
    // Iterate through the tokens until reaching the 2nd position
    while (token != NULL ) {
-      token = strtok(NULL, "_");
 
       if (position == 0 ) {      //get band
 	 if (strstr(token, "ACS3"))
@@ -637,6 +637,7 @@ void const callback(char *filein, int isREFHOT){
          printf("The data file index # is: %05d\n", subScan);
       }
 
+      token = strtok(NULL, "_");
       position++;
    }
 
