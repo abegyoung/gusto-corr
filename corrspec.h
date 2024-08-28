@@ -14,5 +14,3 @@ struct Spectrum
 extern struct Spectrum spec[4];
 
 extern PyObject *pName, *pModule, *pFunc1, *pFunc2;
-
-

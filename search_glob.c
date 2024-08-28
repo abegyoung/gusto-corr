@@ -4,6 +4,7 @@
 #include <glob.h>
 #include <regex.h>
 #include <stdbool.h>
+#include "search_glob.h"
 
 int search_glob_results(glob_t glob_result, int scan_to_check) {
     int isREFHOT = 0;
@@ -49,3 +50,4 @@ bool file_exists(const char *filename) {
     }
     return false;
 }
+

@@ -27,6 +27,27 @@ struct Spectrum spec[4];
 PyObject *pName, *pModule;
 PyObject *pFunc1, *pFunc2;
 
+struct RefDestination
+{
+   int scanID1;
+   int scanID2;
+   int scanID3;
+   int scanID4;
+};
+
+struct RefDestination find_REF_destination(glob_t glob_result, int)
+{
+	struct RefDestination destination;
+
+	destination.scanID1 = 1;
+	destination.scanID2 = 2;
+	destination.scanID3 = 3;
+	destination.scanID4 = 4;
+
+	return destination;
+}
+
+
 static void handler(int sig, siginfo_t *si, void *unused)
 {
    printf("Got SIGSEGV at address: 0x%lx\n", (long) si->si_addr);
@@ -47,6 +68,7 @@ static void handler(int sig, siginfo_t *si, void *unused)
 int main(int argc, char **argv) {
 
    int isREFHOT = 0;
+   struct RefDestination destination;
    glob_t glob_result;
 
    // Set up SIGSEGV handler
@@ -99,13 +121,15 @@ int main(int argc, char **argv) {
    }
 
 
-   int unit = 3;
    char *filename = malloc(23*sizeof(char));
    const char *prefix_names[]={"HOT", "OTF", "REF"};
 
+   int unit = atoi(argv[1]);
+   int start_scanID = atoi(argv[2]);
+   int stop_scanID = atoi(argv[3]);
    // Make a list of files to process
-   for (int scanid=14544; scanid<=14555; scanid++){
-      for(int subscan=0; subscan<50; subscan++){
+   for (int scanid=start_scanID; scanid<=stop_scanID; scanid++){
+      for(int subscan=0; subscan<100; subscan++){
          for(int type=0; type<3; type++){
             sprintf(filename, "ACS%d_%s_%05d_%04d.dat", unit, prefix_names[type], scanid, subscan);
 	    filename[23] = '\0';
@@ -119,7 +143,14 @@ int main(int argc, char **argv) {
                   isREFHOT = 1;
                printf("isREFHOT? %d\n", isREFHOT);
 
+	       destination = find_REF_destination(glob_result, scanid);
+	       printf("Ref destination 1 = %d\n", destination.scanID1);
+	       printf("Ref destination 2 = %d\n", destination.scanID2);
+	       printf("Ref destination 3 = %d\n", destination.scanID3);
+	       printf("Ref destination 4 = %d\n", destination.scanID4);
+
                // Send file to be processed
+               //callback(filename, isREFHOT, destination);  // for REF and REFHOT, suggest fitsfile scanID
                callback(filename, isREFHOT);
 
                // reset vars

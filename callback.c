@@ -1307,11 +1307,18 @@ void const callback(char *filein, int isREFHOT){
       char fitsfile[20];
       if ( strstr(prefix, "REF\0") || isREFHOT)
       {
+
          // send the header, data, and fits filename to be compiled & written TWICE
+         sprintf(fitsfile, "ACS%d_%05d.fits", UNIT-1, scanID-3); // if REF or HOTREF, then put in previous fits file
+         append_to_fits_table(fitsfile, fits_header, array, THOTID); 
+
          sprintf(fitsfile, "ACS%d_%05d.fits", UNIT-1, scanID-1); // if REF or HOTREF, then put in previous fits file
          append_to_fits_table(fitsfile, fits_header, array, THOTID); 
 
          sprintf(fitsfile, "ACS%d_%05d.fits", UNIT-1, scanID+1); // if REF or HOTREF, then bookend fits files
+         append_to_fits_table(fitsfile, fits_header, array, THOTID); 
+
+         sprintf(fitsfile, "ACS%d_%05d.fits", UNIT-1, scanID+3); // if REF or HOTREF, then bookend fits files
          append_to_fits_table(fitsfile, fits_header, array, THOTID); 
       }
       else
