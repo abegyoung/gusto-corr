@@ -17,6 +17,7 @@ def doStuff(scan):
     CHANNEL_FLAG = data['CHANNEL_FLAG']
     ROW_FLAG = data['ROW_FLAG']
     npix   = hdu[0].header['NPIX']
+    line   = hdu[0].header['LINE']
     nrow   = len(spec)
     mixer  = data['MIXER']
     scanID = data['scanID']
@@ -34,13 +35,22 @@ def doStuff(scan):
     # Iridium
     # 1610      329, 330
     # Look through all of the spectra to set row_flags for noisy data
-    for i in range(nrow-1):
-        for j in range(npix-1):
-            CHANNEL_FLAG[i][j]   = 0
-        CHANNEL_FLAG[i][66:70]   = 1    # LO 1 330 MHz
-        CHANNEL_FLAG[i][134:136] = 1    # LO 2 656 MHz
-        CHANNEL_FLAG[i][201:203] = 1    # LO 3 980 MHz
-        CHANNEL_FLAG[i][331:335] = 1    # Iridium 1 1616-1625 MHz
+    if(line=='NII'):
+        for i in range(nrow-1):
+            for j in range(npix-1):
+                CHANNEL_FLAG[i][j]   = 0
+            CHANNEL_FLAG[i][31:36]   = 1    # LO 1 330 MHz
+            CHANNEL_FLAG[i][66:69]   = 1    # LO 2 656 MHz
+            CHANNEL_FLAG[i][100:101] = 1    # LO 3 980 MHz
+            CHANNEL_FLAG[i][165:168] = 1    # Iridium 1 1616-1625 MHz
+    elif(line=='CII'):
+        for i in range(nrow-1):
+            for j in range(npix-1):
+                CHANNEL_FLAG[i][j]   = 0
+            CHANNEL_FLAG[i][66:70]   = 1    # LO 1 330 MHz
+            CHANNEL_FLAG[i][134:136] = 1    # LO 2 656 MHz
+            CHANNEL_FLAG[i][201:203] = 1    # LO 3 980 MHz
+            CHANNEL_FLAG[i][331:335] = 1    # Iridium 1 1616-1625 MHz
 
     # Write the change back to the fits file
     hdu.flush()
