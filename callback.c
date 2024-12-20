@@ -85,7 +85,6 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
     int array_length;
     long nrows;
     char extname[] = "DATA_TABLE";
-    long n_elements = sizeof(array) / sizeof(array[0]);
 
     CURL *curl;
     char *query = malloc(BUFSIZ);
@@ -141,6 +140,7 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
 	       npix = 1024;
 	       syntmult = 144;
             }
+	    int ser_flag = 0;
 
 	    // Create some Primary header keyword value pairs and fill them from the current fits_header struct
             fits_write_key(fptr, TINT,      "CALID",   &fits_header->CALID,  "ID of correlator calibration", &status);
@@ -165,7 +165,7 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
             fits_write_key(fptr, TSTRING, "DLEVEL",    "0.7",      "data level",      &status);
 	    get_proctime(proctime);
             fits_write_key(fptr, TSTRING, "Proctime",  proctime,  "processing time", &status);
-            fits_write_key(fptr, TINT,    "SER_FLAG",  "0",       "SERIES FLAG",     &status);
+            fits_write_key(fptr, TINT,    "SER_FLAG",  &ser_flag, "SERIES FLAG",     &status);
 
 	    fits_write_comment(fptr, "  Housekeeping Temperatures", &status);
 	    // Ambient HK_TEMP           0          1          2          3          4          5          6          7          
@@ -388,6 +388,10 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
         array_length=1024;
     }
 
+    double *ch_flag= malloc(array_length*sizeof(double));
+    for (int i=0; i<array_length; i++)
+       ch_flag[i] = 0;
+
     // Move to the named HDU (where the table is stored)
     if (fits_movnam_hdu(fptr, BINARY_TBL, extname, 0, &status)) {
         fits_report_error(stderr, status);  // Print any error message
@@ -454,7 +458,7 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
         return;
     }
     // Write the channel flag as a single 2*N column
-    if (fits_write_col(fptr, TDOUBLE, 29, nrows+1, 1, 1 * array_length, array, &status)) {
+    if (fits_write_col(fptr, TDOUBLE, 29, nrows+1, 1, 1 * array_length, ch_flag, &status)) {
         fits_report_error(stderr, status);  // Print any error message
         return;
     }
@@ -513,7 +517,7 @@ char nthdigit(int x, int n)
 
 // Callback function to process the file
 void const callback(char *filein, int isREFHOT){
-   char *fullpath= malloc(48*sizeof(char));
+   char *fullpath= malloc(60*sizeof(char));
    strcpy(fullpath, filein); // make a copy leaving filein intact for later tokenization
 
    char *datafile;	// datafile is filename with no path - used in fits header
@@ -523,7 +527,6 @@ void const callback(char *filein, int isREFHOT){
    } else {
 	   datafile = fullpath;
    }
-
 
    //char errfile[64] = "err.log";
 
@@ -1320,12 +1323,14 @@ void const callback(char *filein, int isREFHOT){
 
          sprintf(fitsfile, "ACS%d_%05d.fits", UNIT-1, scanID+3); // if REF or HOTREF, then bookend fits files
          append_to_fits_table(fitsfile, fits_header, array, THOTID); 
+
       }
       else
       {
          // send the header, data, and fits filename to be compiled & written
          sprintf(fitsfile, "ACS%d_%05d.fits", UNIT-1, scanID);
          append_to_fits_table(fitsfile, fits_header, array, THOTID); 
+
       }
       if (DEBUG)
          printf("%s\n", fitsfile);
