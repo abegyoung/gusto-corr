@@ -140,26 +140,21 @@ int main(int argc, char **argv) {
         memcpy(&pos.telescope.z,         buffer+148, sizeof(double));
 
         printf("%ld.%ld\t",   pos.here.now.tv_sec, pos.here.now.tv_nsec);
-        //printf("GONDOLA_ALT= %f\n",pos.here.altitude);
-        //printf("LONG= %f\n", RAD2DEG*pos.here.longitude);
-        //printf("LAT= %f\n",  RAD2DEG*pos.here.latitude);
         printf("%f\t",   pos.here.altitude);
         printf("%f\t",   RAD2DEG*pos.here.latitude);
         printf("%f\t",   RAD2DEG*pos.here.longitude);
         //correctPrecession(&pos.here.ra, &pos.here.dec, pos.here.now.tv_sec);
-        //printf("RA= %s\t",   rad2hms(pos.here.ra));
-        //printf("LAT= %s\n",rad2dms(pos.here.dec));
         printf("%f\t",   RAD2DEG*pos.here.ra);
         printf("%f\t",   RAD2DEG*pos.here.dec);
         printf("%d\n",   scanID);
 
-        //printf("fixNum= %d\n",  (pos.fix.fixNum));
-        //printf("StrCnt= %d\n\n",(pos.fix.starCount));
+        printf("%d\t",  pos.fix.fixNum);
+        printf("%d\t",  pos.fix.starCount);
 
-        //printf("adj i= %f\n",  pos.fix.adjustment.i);
-        //printf("adj j= %f\n",  pos.fix.adjustment.j);
-        //printf("adj k= %f\n",  pos.fix.adjustment.k);
-        //printf("adj r= %f\n\n",pos.fix.adjustment.r);
+        printf("%f\t",  pos.fix.adjustment.i);
+        printf("%f\t",  pos.fix.adjustment.j);
+        printf("%f\t",  pos.fix.adjustment.k);
+        printf("%f\t",  pos.fix.adjustment.r);
 
         //printf("attTaken i= %f\n",  pos.fix.attitudeTaken.i);
         //printf("attTaken j= %f\n",  pos.fix.attitudeTaken.j);
