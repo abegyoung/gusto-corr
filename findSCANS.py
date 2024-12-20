@@ -7,11 +7,10 @@ import time
 import numpy as np
 import datetime
 from influxdb import InfluxDBClient
-#from influxdb_client import InfluxDBClient
-from tqdm import tqdm
 
 from astropy import units as u
 from astropy.coordinates import SkyCoord
+from astropy.coordinates import FK5
 
 import matplotlib.pyplot as plt
 from PyAstronomy import pyasl
@@ -28,60 +27,79 @@ database = 'gustoDBlp'
 retention_policy = 'autogen'
 bucket = f'{database}/{retention_policy}'
 
-# Center of GUSTO 30 K line in NGC6334
-ra_center  = '+17h22m10s'
-dec_center = '-35d57m35s'
-
-# center of Spitzer NGC6334 8um image
-#ra_center = '+17h20m00s'
-#dec_center = '-35d56m25s'
-
-# half-beam size
-size = 120*u.arcsec
-c = SkyCoord(ra_center, dec_center, frame='icrs')
-
-# half-image size
-ra_img =  30*u.arcmin
-dec_img = 30*u.arcmin
-
 # Use influxdb for V1.0
 # https://influxdb-python.readthedocs.io/en/latest/index.html
 client = InfluxDBClient('localhost', 8086, '', '', 'gustoDBlp')
 
-start_ra = c.ra.deg - ra_img.to(u.deg).value
-end_ra   = c.ra.deg + ra_img.to(u.deg).value
-N_ra     = int(ra_img.to(u.arcmin).value/size.to(u.arcmin).value)
-ra_indx = np.linspace(start_ra, end_ra, N_ra)
+# half-beam size for searching l,b grid
+size = 1*u.degree
 
-start_dec = c.dec.deg - dec_img.to(u.deg).value
-end_dec   = c.dec.deg + dec_img.to(u.deg).value
-N_dec     = int(dec_img.to(u.arcmin).value/size.to(u.arcmin).value)
-dec_indx = np.linspace(start_dec, end_dec, N_dec)
+# image coordinates
+coords = "17h20m50.9s -36d06m54.0s" # NGC6334
+c = SkyCoord(coords, unit=(u.hourangle, u.deg), frame='icrs')
+lat = c.galactic.l.value
+lon = c.galactic.b.value
 
+#galactic image coordinates
+gc = SkyCoord(l=lat*u.degree, b=lon*u.degree, frame='galactic')
+
+# image size
+l_img = 6*u.degree
+b_img = 2*u.degree
+
+# create l index
+start_l  = gc.l.deg - l_img.value/2
+end_l    = gc.l.deg + l_img.value/2
+N_l      = int(l_img.value/(2*size.value))
+l_indx   = np.linspace(start_l, end_l, N_l)
+
+# create b index
+start_b  = gc.b.deg - b_img.value/2
+end_b    = gc.b.deg + b_img.value/2
+N_b      = int(b_img.value/(2*size.value))
+b_indx   = np.linspace(start_b, end_b, N_b)
+
+# list of scanIDs in requested image
 my_list=[]
 
-for ra in tqdm(ra_indx):
+for l in l_indx:
     numi += 1
     numj = 0
-    for dec in dec_indx:
+    for b in b_indx:
         numj += 1
-        #print('{:f}'.format(ra), '{:f}'.format(dec))
         # find all points in udpPointing where we pointed at ra, dec
-        myquery = f'SELECT * FROM "udpPointing" WHERE RA<{(ra +size.to(u.deg).value)}  AND \
-                                                      RA>{(ra -size.to(u.deg).value)}  AND \
-                                                     DEC<{(dec+size.to(u.deg).value)}  AND \
-                                                     DEC>{(dec-size.to(u.deg).value)}' 
+        gci = SkyCoord(l=l*u.degree, b=b*u.degree, frame='galactic')
+        c = gci.transform_to(FK5)
+        myquery = f'SELECT * FROM "udpPointing" WHERE RA< {(c.ra.value +size.to(u.deg).value)} AND \
+                                                      RA> {(c.ra.value -size.to(u.deg).value)} AND \
+                                                      DEC<{(c.dec.value+size.to(u.deg).value)} AND \
+                                                      DEC>{(c.dec.value-size.to(u.deg).value)}' 
         points = client.query(myquery).get_points()
 
         # For loop over all of these pointings
         # POINTS contains a (time, scanID) for each pointing at (ra,dec)
+        #tmp_list = []   # temporary list for (l,b,0/1) output
+        #for point in points:
+        #    tmp_list.append(point.get("scanID"))
+
+        #my_list.append(tmp_list)
         for point in points:
             my_list.append(point.get("scanID"))
 
+        # output of l,b and yes/no for udpPointing
+        # used for plotting where we may have data
+        #if tmp_list:
+        #    print(l, b, 1)
+        #elif not tmp_list:
+        #    print(l, b, 0)
 
-print(sorted(list(set(my_list))))
-print(min(my_list))
-print(max(my_list))
 
+prefix = "ACS3_"
+suffix = "_5_L09.fits"
+scanID_list = sorted(list(set(my_list)))
+filenames = ["{:s}{:05d}{:s}".format(prefix,int(num),suffix) for num in scanID_list]
+
+# output sorted list of L1 fits filenames
+print("\n".join(filenames))
 
 
