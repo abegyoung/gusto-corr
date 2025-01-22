@@ -159,7 +159,8 @@ size_t write_callback(char *contents, size_t size, size_t nmemb, void *userp) {
 
     // dynamically allocate structure
     influxReturn = malloc(sizeof(*influxReturn));
-    influxReturn->length = nmeas * (ncols-2);
+    //influxReturn->length = nmeas * (ncols-2);  //edit: explicitly use length, reuse length var
+    influxReturn->length = nmeas            ;  //edit: explicitly use length, reuse length var
     influxReturn->value = (float *)malloc(nmeas*(ncols-2) * sizeof(float));
 
     influxReturn->name   = (char **)malloc(nmeas*(ncols-2) * sizeof(char *));
@@ -172,7 +173,8 @@ size_t write_callback(char *contents, size_t size, size_t nmemb, void *userp) {
 
     // Set all struct values to 0, just in case we don't get any returns from influxDB
     //memset(&influxReturn, 0, sizeof(influxReturn));
-    for (int i=0; i<influxReturn->length; i++){
+    //for (int i=0; i<influxReturn->length; i++){  //edit: explicitly use length, reuse length var
+    for (int i=0; i<(nmeas * (ncols-2)); i++){
 	    influxReturn->value[i] = 0.;
     }
 

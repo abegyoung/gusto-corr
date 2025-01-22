@@ -1,7 +1,6 @@
 #define _XOPEN_SOURCE
-#include <inttypes.h>
 #include <sys/time.h>
-#include <time.h>
+#include <inttypes.h>
 #include <string.h>
 #include "callback.h"
 #include "corrspec.h"
@@ -35,6 +34,29 @@ void circularShiftLeft(float arr[], int size) {
 
     // Place the first element at the end of the array
     arr[size - 1] = firstElement;
+}
+
+
+double parse_iso8601_to_epoch(const char *iso8601) {
+    struct tm tm_time = {0};
+    char *end_ptr;
+
+    // Parse the main part of the timestamp (YYYY-MM-DDTHH:MM:SS)
+    strptime(iso8601, "%Y-%m-%dT%H:%M:%S", &tm_time);
+
+    // Convert to seconds since the epoch (UTC)
+    tm_time.tm_isdst = -1; // Not considering daylight saving time
+    time_t seconds = timegm(&tm_time);
+
+    // Parse fractional seconds
+    double fractional_seconds = 0.0;
+    const char *fraction_start = strchr(iso8601, '.');
+    if (fraction_start != NULL) {
+        fractional_seconds = strtod(fraction_start, &end_ptr);
+    }
+
+    // Combine whole seconds and fractional seconds
+    return (double)seconds + fractional_seconds;
 }
 
 
@@ -869,16 +891,66 @@ void const callback(char *filein, int isREFHOT){
 
       // RA, DEC from InfluxDB 0.5s ahead or behind time
       curl = init_influx();
-      sprintf(query, "&q=SELECT * FROM \"udpPointing\" WHERE \"scanID\"=~/^%d/ AND time>\%" PRIu64 "500000000 AND time<\%" PRIu64 "500000000", scanID, UNIXTIME-1, UNIXTIME+1);
+      // Rework how the Influx query is built.  Previously, UNIXTIME to sec was used with %PRIu64 and the remaining 9 zeros to be compatible with database stores nsec timestamps
+      // Change to assemble the UNIXTIME+FRAC now and process as a %ld native nsec with better control over timestamp window, combined with processing of nearest time in Influx response
+      //sprintf(query, "&q=SELECT * FROM \"udpPointing\" WHERE \"scanID\"=~/^%d/ AND time>\%" PRIu64 "500000000 AND time<\%" PRIu64 "500000000", scanID, UNIXTIME-1, UNIXTIME);  // Pre-Jan 2025 version
+      //
+      //Post-Jan 2025 version of timestamping: (hey, I'm not the one that made a nsec-based database!)
+      // And yes, I could and should rewrite the UNIXTIME to be a double and include fractions of a sec natively, but ...
+      uint64_t frac64 = (uint64_t) FRAC;
+      char str_sec[12];	  //enough to hold UNIXTIME in secs
+      char str_frac[12];  //enough to hold fractional part of secs in nsecs
+      char str_res[20];   //enough to hold UNIXTIME in nsecs
+      // convert to strings
+      sprintf(str_sec, "%llu", (unsigned long long)UNIXTIME);
+      sprintf(str_frac,"%09llu", (unsigned long long)(FRAC*1e6));
+      // concatenate
+      strcpy(str_res, str_sec);
+      strcat(str_res, str_frac);
+      // convert back to uint64
+      uint64_t complete_timestamp = strtoull(str_res, NULL, 10);
+
+      // and now build the new query with the EXACT correlator time and +/- 0.5s 
+      sprintf(query, "&q=SELECT * FROM \"udpPointing\" WHERE \"scanID\"=~/^%d/ AND time>%llu AND time<%llu", scanID, (unsigned long long)(complete_timestamp-400000000), (unsigned long long)(complete_timestamp+400000000));
+
       influxReturn = influxWorker(curl, query);
       RA  = influxReturn->value[6];
       DEC = influxReturn->value[2];
 
+      // QUERY RESPONSE VECTOR
+      // value[0] == ALTITUDE
+      // value[1] == AZIMUTH
+      // value[2] == DEC
+      // value[3] == ELEVATION
+      // value[4] == LATITUDE
+      // value[5] == LONGITUDE
+      // value[6] == RA
+
+      printf("ooo\t%.6f\t%.6f\t%.3f\tooo\n", RA, DEC, (double)UNIXTIME+FRAC/1000.);  //Info print
+
+      if (DEBUG){
+	 printf("unixtime = %ld\n",UNIXTIME);
+	 printf("frac     = %ld\n", (uint64_t)(FRAC*1e6));
+	 printf("timestmp = %f\n", (double)UNIXTIME+FRAC/1000.);
+	 printf("complete = %llu\n", (unsigned long long)(complete_timestamp));
+         printf("udp time = %f\n", parse_iso8601_to_epoch(influxReturn->time));
+	 printf("delta udp-corr timestamp = %.3f\n", (double)UNIXTIME+FRAC/1000. - parse_iso8601_to_epoch(influxReturn->time) );
+	 printf("scanID   = %d\n", influxReturn->scanID);
+
+	 // query return of database measurement "NAME"
+	 for(i=0; i<sizeof(influxReturn->name)/sizeof(char *); i++)
+	   printf("%s", influxReturn->name[i]);
+	 printf("\n");
+
+	 // full vector of response
+	 for(i=0; i<7; i++){
+	   printf("%f\n", influxReturn->value[i]);
+	 }
+
+      }
+													  
       // Free the allocated memory from udpPointing
       freeinfluxStruct(influxReturn);
-
-      if (DEBUG)
-         printf("======== RA=%.3f DEC=%.3f ==========\n", RA, DEC);  //Info print
 										    //
 
       // Single SELECT for CORRELATOR DACS from current or nearest previous Correlator Cal

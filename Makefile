@@ -4,8 +4,8 @@ CXX := gcc
 CFLAGS := -g
 
 ifeq ($(KERNEL), Linux)
-      INCLUDES := -I/usr/local/include -I/usr/pkg/include -I./ -I/usr/include/python3.10
-      LIBS := -Wl,-rpath,/usr/local/lib -lit -L/usr/pkg/lib -L/usr/local/lib -lm -lfftw3 -lcurl -lpython3.10 -lcfitsio -lc
+      INCLUDES := -I/usr/include -I/usr/local/include -I/usr/pkg/include -I./ -I/usr/include/python3.10
+      LIBS := -Wl,-rpath,/usr/local/lib -lit -L/usr/pkg/lib -L/usr/local/lib -lm -lfftw3 -lcurl -lpython3.10 -lcfitsio -lc -lrt
 
 else ifeq ($(KERNEL), Darwin)
       INCLUDES := -I/opt/local/include -I/opt/local/include -I./ -I/usr/include/python3.10
